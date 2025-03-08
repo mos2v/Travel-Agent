@@ -1,2 +1,5 @@
 .env
 faiss_index/
+pre_data.ipynb
+place_details_checkpoint.pkl
+place_ids_checkpoint.pkl
