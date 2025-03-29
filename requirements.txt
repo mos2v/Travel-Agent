@@ -1,0 +1,8 @@
+langchain
+langchain_huggingface
+dotenv
+langchain_nvidia_ai_endpoints
+pip install -qU langchain-community
+numpy < 2
+faiss-cpu
+langchain-groq
