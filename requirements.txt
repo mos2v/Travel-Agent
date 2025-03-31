@@ -1,9 +1,16 @@
+fastapi
+uvicorn
+pydantic
+numpy
+pandas
+tqdm
+python-dotenv
 langchain
-langchain_huggingface
-dotenv
-langchain_nvidia_ai_endpoints
-pip install -qU langchain-community
-numpy < 2
+langchain-community
+langchain-core
+langchain-huggingface
+langchain-nvidia-ai-endpoints
+sentence-transformers
 faiss-cpu
-langchain-groq
-langchain-google-genai
+requests
+asyncio

@@ -134,8 +134,9 @@ class LLMService:
 
         
                
-    def travel_plan(self, retriever, user_query, favorite_places, visitor_type, num_days, budget):
-    
+    def travel_plan(self, retriever, city, favorite_places, visitor_type, num_days, budget):
+        
+        user_query = f'Plan a {num_days}-day trip in {city} with visits to {favorite_places}, and dining options.'
         docs = retriever.invoke(user_query)
         context_text = "\n".join([doc.page_content for doc in docs])
         

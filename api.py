@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -50,7 +49,7 @@ llm_manager = None
 
 
 class TravelPlanRequest(BaseModel):
-    user_query: str
+    city: str
     favorite_places: str
     visitor_type: str
     num_days: str
@@ -61,7 +60,7 @@ async def generate_travel_plan(request: TravelPlanRequest):
     try:
         travel_plan = llm_manager.travel_plan(
             retriever,
-            request.user_query,
+            request.city,
             request.favorite_places,
             request.visitor_type,
             request.num_days,
