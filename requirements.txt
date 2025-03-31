@@ -6,3 +6,4 @@ pip install -qU langchain-community
 numpy < 2
 faiss-cpu
 langchain-groq
+langchain-google-genai

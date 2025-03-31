@@ -4,3 +4,4 @@ place_details_checkpoint.pkl
 place_ids_checkpoint.pkl
 faiss_mpnetv2_v0/
 faiss_mpnetv2_v1.0/
+\__pycache__
