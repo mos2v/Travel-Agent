@@ -16,20 +16,24 @@ import traceback
 async def lifespan(app: FastAPI):
     global retriever, llm_manager
     load_dotenv()
-    print("Initializing data and models...")
+    print("🔁 Loading data...")
     data = DataLoader()
+
+    print("📄 Processing documents...")
     document_processor = DocumentProcessor(data.landmark_prices, data.places_api_data)
-    documents = document_processor.df_to_document()
-    
+    documents = document_processor.load_or_process_documents()
+
+    print("🧠 Loading vector store...")
     vector_store = VectorStoreManager(documents)
     retriever = vector_store.get_retriever()
-    
+
+    print("⚡ Initializing LLM...")
     llm_manager = LLMService("llama-3.3-70b-versatile")
-    print("Initialization complete!")
-    
+
+    print("✅ App initialization complete!")
+
     yield
-    
-    print("Shutting down...")
+    print("🔻 Shutting down...")
 
 
 

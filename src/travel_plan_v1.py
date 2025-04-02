@@ -80,16 +80,19 @@ class VectorStoreManager():
         self.documents = documents
         
     def get_retriever(self):
+        print(f"📁 Checking for FAISS index at: {self.path}")
         if not self.path.exists():
+            print("🚧 Index not found. Creating...")
             vectorstore = FAISS.from_documents(self.documents, self.embeddings)
             vectorstore.save_local(self.path)
-            
+            print("✅ FAISS index created and saved.")
         else:
+            print("📂 FAISS index exists. Loading...")
             vectorstore = FAISS.load_local(self.path, self.embeddings, allow_dangerous_deserialization=True)
-
+            print("✅ FAISS index loaded.")
 
         return vectorstore.as_retriever(search_kwargs={"k": 50})
-    
+
 
 class LLMService:
     def __init__(self, model_name, provider='groq', temperature=0):
