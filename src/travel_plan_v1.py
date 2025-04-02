@@ -179,7 +179,7 @@ if __name__ == '__main__':
     start_time = time.time()  # Start timer
 
     parser = argparse.ArgumentParser(description="Generate a travel plan based on user input.")
-    parser.add_argument('--user_query', type=str, required=True, help="User's travel query")
+    parser.add_argument('--city', type=str, required=True, help="User's travel query")
     parser.add_argument('--favorite_places', type=str, required=True, help="User's favorite types of places")
     parser.add_argument('--visitor_type', type=str, required=True, help="Visitor type (e.g., Foreign, Egyptian)")
     parser.add_argument('--num_days', type=str, required=True, help="Number of travel days")
@@ -205,7 +205,7 @@ if __name__ == '__main__':
     # num_days = "3"
     # budget = "5000"
     
-    travel_plan = llm_manager.travel_plan(retriever, args.user_query, args.favorite_places, args.visitor_type, args.num_days, args.budget)
+    travel_plan = llm_manager.travel_plan(retriever, args.city, args.favorite_places, args.visitor_type, args.num_days, args.budget)
     print(json.dumps(travel_plan, indent=2))
     
     end_time = time.time()  # End timer

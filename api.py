@@ -4,7 +4,7 @@ from pydantic import BaseModel
 import json
 from typing import Optional
 from contextlib import asynccontextmanager
-
+from dotenv import load_dotenv
 from src.travel_plan_v1 import DataLoader, DocumentProcessor, VectorStoreManager, LLMService
 
 
@@ -14,6 +14,7 @@ from src.travel_plan_v1 import DataLoader, DocumentProcessor, VectorStoreManager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global retriever, llm_manager
+    load_dotenv()
     
     print("Initializing data and models...")
     data = DataLoader()
@@ -23,7 +24,7 @@ async def lifespan(app: FastAPI):
     v = VectorStoreManager(documents)
     retriever = v.get_retriever()
     
-    llm_manager = LLMService('llama-3.3-70b-specdec')
+    llm_manager = LLMService("meta/llama-3.3-70b-instruct", provider='nvidia')
     print("Initialization complete!")
     
     yield
