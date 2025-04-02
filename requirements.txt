@@ -34,3 +34,5 @@ torch==2.6.0
 
 # For vector store
 faiss-cpu==1.10.0
+
+langchain-groq==0.3.1
