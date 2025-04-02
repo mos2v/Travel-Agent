@@ -128,7 +128,7 @@ class LLMService:
         if self.provider == 'groq' or 'google_genai':
             return init_chat_model(self.model_name, model_provider= self.provider, temperature = self.temperature).with_structured_output(self.json_schema)
         elif self.provider == 'nvidia':
-            return ChatNVIDIA(self.model, temperature = self.temperature).with_structured_output(self.json_schema)
+            return ChatNVIDIA(self.model_name, temperature = self.temperature).with_structured_output(self.json_schema)
         else:
             raise ValueError('Unsupported model provider')
 
@@ -175,7 +175,6 @@ class LLMService:
     
     
 if __name__ == '__main__':
-    # load_dotenv()
     start_time = time.time()  # Start timer
 
     parser = argparse.ArgumentParser(description="Generate a travel plan based on user input.")
@@ -197,7 +196,7 @@ if __name__ == '__main__':
     v = VectorStoreManager(documents)
     retriever = v.get_retriever()
     
-    llm_manager = LLMService('llama-3.3-70b-specdec')
+    llm_manager = LLMService("llama-3.3-70b-versatile")
     
     # user_query = "Plan a 3-day trip in Luxor with visits to cultural sites, art galleries, and dining options."
     # favorite_places = "Cultural sites, historical landmarks, art galleries"

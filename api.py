@@ -6,6 +6,7 @@ from typing import Optional
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from src.travel_plan_v1 import DataLoader, DocumentProcessor, VectorStoreManager, LLMService
+import traceback
 
 
 
@@ -15,7 +16,6 @@ from src.travel_plan_v1 import DataLoader, DocumentProcessor, VectorStoreManager
 async def lifespan(app: FastAPI):
     global retriever, llm_manager
     load_dotenv()
-    
     print("Initializing data and models...")
     data = DataLoader()
     document_processor = DocumentProcessor(data.landmark_prices, data.places_api_data)
@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     v = VectorStoreManager(documents)
     retriever = v.get_retriever()
     
-    llm_manager = LLMService("meta/llama-3.3-70b-instruct", provider='nvidia')
+    llm_manager = LLMService("llama-3.3-70b-versatile")
     print("Initialization complete!")
     
     yield
@@ -71,6 +71,7 @@ async def generate_travel_plan(request: TravelPlanRequest):
         # Return the travel plan as JSON
         return travel_plan
     except Exception as e:
+        traceback.print_exc()  # Add this line
         raise HTTPException(status_code=500, detail=f"Error generating travel plan: {str(e)}")
 
 # Health check endpoint
