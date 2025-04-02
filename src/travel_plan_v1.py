@@ -16,14 +16,18 @@ from pydantic import BaseModel, Field
 from tqdm import tqdm
 import argparse
 import time
+import pickle
 
 class DataLoader:
     def __init__(self):
-        self.landmark_prices = pd.read_csv(os.path.abspath('../Travel-Agent/data/egypt_v0.1.csv'))
-        self.places_api_data = pd.read_csv(os.path.abspath('../Travel-Agent/data/places_details.csv'))
-
+        base_path = Path(__file__).parent.resolve()
+        data_path = base_path / ".." / "data"
+        self.landmark_prices = pd.read_csv(data_path / "egypt_v0.1.csv")
+        self.places_api_data = pd.read_csv(data_path / "places_details.csv")
+        
 class DocumentProcessor():
-    def __init__(self, landmark_prices: pd.DataFrame, places_api_data: pd.DataFrame):
+    def __init__(self, landmark_prices: pd.DataFrame, places_api_data: pd.DataFrame, cache_path: str = "documents.pkl"):
+        self.cache_path = Path(cache_path)
         self.landmark_prices = landmark_prices
         self.places_api_data = places_api_data
         self.documents = []
@@ -55,6 +59,18 @@ class DocumentProcessor():
             """
             self.documents.append(Document(page_content=text, metadata={"source": 'Places_api', 'Type': f"{row['primaryTypeDisplayName.text']}", 'city': f"{row['formattedAddress']}"}))
             
+        return self.documents
+    
+    def load_or_process_documents(self) -> List[Document]:
+        if self.cache_path.exists():
+            print("Loading cached documents...")
+            with open(self.cache_path, "rb") as f:
+                self.documents = pickle.load(f)
+        else:
+            print("Processing documents...")
+            self.documents = self.df_to_document()
+            with open(self.cache_path, "wb") as f:
+                pickle.dump(self.documents, f)
         return self.documents
         
 class VectorStoreManager():
@@ -191,12 +207,12 @@ if __name__ == '__main__':
     data = DataLoader()
       
     document_processor = DocumentProcessor(data.landmark_prices, data.places_api_data)
-    documents = document_processor.df_to_document()
+    documents = document_processor.load_or_process_documents()
     
-    v = VectorStoreManager(documents)
-    retriever = v.get_retriever()
+    vector_store = VectorStoreManager(documents=documents)
+    retriever = vector_store.get_retriever()
     
-    llm_manager = LLMService("llama-3.3-70b-versatile")
+    llm_manager = LLMService("meta/llama-3.3-70b-instruct", provider='nvidia')
     
     # user_query = "Plan a 3-day trip in Luxor with visits to cultural sites, art galleries, and dining options."
     # favorite_places = "Cultural sites, historical landmarks, art galleries"

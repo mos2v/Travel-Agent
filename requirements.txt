@@ -1,16 +1,36 @@
-fastapi
-uvicorn
-pydantic
-numpy
-pandas
-tqdm
-python-dotenv
-langchain
-langchain-community
-langchain-core
-langchain-huggingface
-langchain-nvidia-ai-endpoints
-sentence-transformers
-faiss-cpu
-requests
-asyncio
+# FastAPI web framework
+fastapi==0.115.12
+
+# ASGI server for running FastAPI
+uvicorn[standard]==0.34.0
+
+# Data manipulation
+pandas==2.2.3
+numpy==1.26.4
+
+# Environment variable loading
+python-dotenv==1.1.0
+
+# Progress bars
+tqdm==4.66.4
+
+# Data validation
+pydantic==2.11.1
+
+# LangChain Core Framework
+langchain==0.3.21
+langchain-core==0.3.49
+langchain-community==0.3.20
+
+# LangChain integrations
+langchain-huggingface==0.1.2
+langchain-nvidia-ai-endpoints==0.3.9
+
+# Transformers for sentence embeddings
+sentence-transformers==4.0.1
+
+# Optional: Just in case the code or your runtime ends up using torch
+torch==2.6.0
+
+# For vector store
+faiss-cpu==1.10.0

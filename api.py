@@ -21,8 +21,8 @@ async def lifespan(app: FastAPI):
     document_processor = DocumentProcessor(data.landmark_prices, data.places_api_data)
     documents = document_processor.df_to_document()
     
-    v = VectorStoreManager(documents)
-    retriever = v.get_retriever()
+    vector_store = VectorStoreManager(documents)
+    retriever = vector_store.get_retriever()
     
     llm_manager = LLMService("llama-3.3-70b-versatile")
     print("Initialization complete!")
