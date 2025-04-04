@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
-from src.travel_plan_v1 import DataLoader, DocumentProcessor, VectorStoreManager, LLMService
+from src.travel_plan_v2 import DataLoader, DocumentProcessor, VectorStoreManager, LLMService
 from src.token_manager import TokenManager
 import traceback
 import os 
@@ -39,14 +39,9 @@ async def lifespan(app: FastAPI):
     logger.info("⚡ Initializing LLM...")
     
     model_name, provider = token_manager.get_current_model()
+    
     llm_manager = LLMService(model_name, provider=provider)
     
-    # llm_manager = LLMService("qwen-qwq-32b")
-    # llm_manager = LLMService("llama-3.3-70b-versatile")
-    # llm_manager = LLMService("llama-3.2-90b-vision-preview")
-    # llm_manager = LLMService("llama-3.3-70b-specdec")
-    # llm_manager = LLMService("deepseek-r1-distill-qwen-32b")
-    # llm_manager = LLMService("meta/llama-3.3-70b-instruct", provider='nvidia')
     logger.info(f"✅ App initialized with model: {model_name} (provider: {provider})")
 
     yield
