@@ -157,10 +157,10 @@ class LLMService:
             },
             "required": ["days", "total_approximate_cost"]
         }
-        self.llm =self.initialize_llm()
+        self.llm = self.initialize_llm()
         
     def initialize_llm(self):
-        if self.provider == 'groq' or 'google_genai':
+        if self.provider == 'groq' or 'google-genai':
             return init_chat_model(self.model_name, model_provider= self.provider, temperature = self.temperature).with_structured_output(self.json_schema)
         elif self.provider == 'nvidia':
             return ChatNVIDIA(self.model_name, temperature = self.temperature).with_structured_output(self.json_schema)
@@ -169,8 +169,10 @@ class LLMService:
 
         
                
-    def travel_plan(self, retriever, city, favorite_places, visitor_type, num_days, budget):
-        
+    def travel_plan(self, retriever, city, favorite_places, visitor_type, num_days, budget, callbacks=None):
+        """
+        Extended version of travel_plan that accepts a callbacks parameter for token tracking.
+        """
         user_query = f'Plan a {num_days}-day trip in {city} with visits to {favorite_places}, and dining options.'
         docs = retriever.invoke(user_query)
         context_text = "\n".join([doc.page_content for doc in docs])
@@ -206,7 +208,12 @@ class LLMService:
             num_days=num_days,
             budget=budget
         )
-        return self.llm.invoke(prompt)
+        
+        # Add callbacks configuration if provided
+        if callbacks:
+            return self.llm.invoke(prompt, config={"callbacks": callbacks})
+        else:
+            return self.llm.invoke(prompt)
     
     
 if __name__ == '__main__':
