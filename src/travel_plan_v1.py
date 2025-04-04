@@ -93,6 +93,22 @@ class VectorStoreManager():
 
         return vectorstore.as_retriever(search_kwargs={"k": 50})
 
+class Activity(BaseModel):
+    time: str = Field(..., description="Time of the activity")
+    activity: str = Field(..., description="Name of the activity")
+    location: str = Field(..., description="Location name")
+    price_range: Optional[str] = Field(None, description="Price range or cost")
+
+class Day(BaseModel):
+    day: str = Field(..., description="Theme of the Day or Day label, e.g., 'Day 1'")
+    activities: List[Activity] = Field(..., description="Activities planned for the day")
+    approximate_cost: str = Field(..., description="Total cost for the day")
+
+class TravelItinerary(BaseModel):
+    days: List[Day] = Field(..., description="List of days with planned activities")
+    total_approximate_cost: str = Field(..., description="Total cost for the trip")
+    notes: Optional[str] = Field(None, description="Any additional notes or assumptions")
+
 
 class LLMService:
     def __init__(self, model_name, provider='groq', temperature=0):
@@ -177,7 +193,7 @@ class LLMService:
         - Overall budget for all days: {budget} EGP
         - Exclude hotels from the plan.
         - Ensure that the itinerary includes at least 3 meals per day.
-
+        
         Based on the above, return a detailed {num_days}-day travel itinerary with approximate costs and suggestions. If some details are missing, make reasonable assumptions and indicate them.
         """
         )
@@ -197,7 +213,7 @@ if __name__ == '__main__':
     start_time = time.time()  # Start timer
 
     parser = argparse.ArgumentParser(description="Generate a travel plan based on user input.")
-    parser.add_argument('--city', type=str, required=True, help="User's travel query")
+    parser.add_argument('--city', type=str, required=True, help="User's travel City")
     parser.add_argument('--favorite_places', type=str, required=True, help="User's favorite types of places")
     parser.add_argument('--visitor_type', type=str, required=True, help="Visitor type (e.g., Foreign, Egyptian)")
     parser.add_argument('--num_days', type=str, required=True, help="Number of travel days")
@@ -215,8 +231,10 @@ if __name__ == '__main__':
     vector_store = VectorStoreManager(documents=documents)
     retriever = vector_store.get_retriever()
     
-    llm_manager = LLMService("meta/llama-3.3-70b-instruct", provider='nvidia')
-    
+    # llm_manager = LLMService("meta/llama-3.1-405b-instruct", provider='nvidia')
+    # llm_manager = LLMService("meta/llama-3.3-70b-instruct", provider='nvidia')
+    llm_manager = LLMService("qwen-qwq-32b")
+
     # user_query = "Plan a 3-day trip in Luxor with visits to cultural sites, art galleries, and dining options."
     # favorite_places = "Cultural sites, historical landmarks, art galleries"
     # visitor_type = "Foreign"
@@ -224,7 +242,10 @@ if __name__ == '__main__':
     # budget = "5000"
     
     travel_plan = llm_manager.travel_plan(retriever, args.city, args.favorite_places, args.visitor_type, args.num_days, args.budget)
-    print(json.dumps(travel_plan, indent=2))
+    print(json.dumps(travel_plan, indent=4))
+    
+    # json_output = travel_plan.model_dump_json(indent=4) 
+    # print(json_output)
     
     end_time = time.time()  # End timer
     print(f"Execution time: {end_time - start_time:.5f} seconds")
