@@ -29,7 +29,7 @@ langchain-google-genai==2.1.2
 
 # Transformers for sentence embeddings
 sentence-transformers==4.0.1
-
+transformers==4.50.3
 # Optional: Just in case the code or your runtime ends up using torch
 torch==2.6.0
 
