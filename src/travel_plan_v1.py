@@ -240,8 +240,10 @@ if __name__ == '__main__':
     
     # llm_manager = LLMService("meta/llama-3.1-405b-instruct", provider='nvidia')
     # llm_manager = LLMService("meta/llama-3.3-70b-instruct", provider='nvidia')
-    llm_manager = LLMService("qwen-qwq-32b")
-
+    # llm_manager = LLMService("llama-3.2-90b-vision-preview")
+    # llm_manager = LLMService("gemini-2.0-flash-exp-image-generation", provider="google-genai", temperature=0)
+    llm_manager = LLMService('gemini-2.5-pro-exp-03-25',  provider="google-genai", temperature=0.5)
+    
     # user_query = "Plan a 3-day trip in Luxor with visits to cultural sites, art galleries, and dining options."
     # favorite_places = "Cultural sites, historical landmarks, art galleries"
     # visitor_type = "Foreign"

@@ -23,28 +23,28 @@ class TokenManager:
         if models_config is None:
             self.models_config = {
                 "high_priority": {
-                    "name": "llama-3.3-70b-specdec",
-                    "provider": "groq",
-                    "token_limit": 96000,
+                    "name": "gemini-2.0-flash",
+                    "provider": "google-genai",
+                    "token_limit": 4000000,
                     "priority": 1
                 },
                 "medium_priority_1": {
-                    "name": "llama-3.3-70b-versatile",
-                    "provider": "groq",
-                    "token_limit": 96000,
+                    "name": "gemini-2.0-flash-lite",
+                    "provider": "google-genai",
+                    "token_limit": 4000000,
                     "priority": 2
                 },
                 "medium_priority_2": {
-                  "name": "gemini-2.0-flash",
-                  "provider": "google-genai",
-                  "token_limit": 3500000,
-                  "priority": 3  
+                    "name": 'gemini-2.5-pro-exp-03-25',
+                    "provider": 'google-genai',
+                    "token_limit": 135000,
+                    "priority": 3  
                 },
                 "medium_priority_3": {
-                  "name": "gemini-2.0-flash-lite",
-                  "provider": "google-genai",
-                  "token_limit": 3500000,
-                  "priority": 4,
+                    "name": "gemini-2.5-pro-preview-03-25",
+                    "provider": 'google-genai',
+                    "token_limit": 135000,
+                    "priority": 4,
                 },
                 "low_priority_1": {
                     "name": "llama-3.2-90b-vision-preview",
@@ -53,35 +53,38 @@ class TokenManager:
                     "priority": 5
                 },
                 "low_priority_2": {
-                    "name": "qwen-qwq-32b",
-                    "provider": "groq",
-                    "token_limit": 1000000,
+                    "name":"gemini-2.0-flash-exp-image-generation", 
+                    "provider":"google-genai",
+                    "token_limit": 135000,
                     "priority": 6
                 },
                 "low_priority_3": {
-                    "name": "deepseek-r1-distill-llama-70b",
+                    "name": "llama-3.3-70b-specdec",
                     "provider": "groq",
-                    "token_limit": 1000000,
+                    "token_limit": 96000,
                     "priority": 7
                 },
                 "low_priority_4": {
-                    "name": 'gemini-2.5-pro-exp-03-25',
-                    "provider": 'google-genai',
-                    "token_limit": 100000,
+                    "name": "llama-3.3-70b-versatile",
+                    "provider": "groq",
+                    "token_limit": 96000,
                     "priority": 8
                 },
                 "low_priority_5": {
-                    "name": "gemini-2.5-pro-preview-03-25",
-                    "provider": 'google-genai',
-                    "token_limit": 100000,
+                    "name": "qwen-qwq-32b",
+                    "provider": "groq",
+                    "token_limit": 1000000,
                     "priority": 9
                 },
-                "low_priority_6": {
-                    "name": "meta/llama-3.3-70b-instruct",
-                    "provider": "nvidia",
-                    "token_limit": 1000000,
-                    "priority": 10
-                },
+                # "low_priority_6": {
+                #     "name": "deepseek-r1-distill-llama-70b",
+                #     "provider": "groq",
+                #     "token_limit": 1000000,
+                #     "name": "meta/llama-3.3-70b-instruct",
+                #     "provider": "nvidia",
+                #     "token_limit": 1000000,
+                #     "priority": 10
+                # },
                 # "fallback": {
                 #     "name": "meta/llama-3.1-450b-instruct",
                 #     "provider": "nvidia",
