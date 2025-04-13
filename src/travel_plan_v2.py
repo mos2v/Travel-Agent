@@ -1,7 +1,4 @@
-import os
-import sys
 import pandas as pd
-import numpy as np
 from pathlib import Path
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 import json
@@ -19,6 +16,9 @@ import time
 import pickle
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from langchain_mistralai import ChatMistralAI
+from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 
 class DataLoader:
@@ -162,7 +162,7 @@ class TravelItinerary(BaseModel):
 
 
 class LLMService:
-    def __init__(self, model_name, provider='groq', temperature=0):
+    def __init__(self, model_name, provider='groq', temperature: float = 0):
         self.provider = provider
         self.model_name = model_name
         self.temperature = temperature
@@ -213,11 +213,15 @@ class LLMService:
         print(f"✅ LLM ready: {model_name}")
         
     def initialize_llm(self):
-        if self.provider == 'groq' or self.provider == 'google-genai':
-            return init_chat_model(self.model_name, model_provider=self.provider, temperature=self.temperature).with_structured_output(self.json_schema)
+        if self.provider == 'groq':
+            return ChatGroq(model=self.model_name, temperature=self.temperature).with_structured_output(self.json_schema)
         elif self.provider == 'nvidia':
-            return ChatNVIDIA(self.model_name, temperature=self.temperature).with_structured_output(self.json_schema)
-        else:
+            return ChatNVIDIA(model=self.model_name, temperature=self.temperature).with_structured_output(self.json_schema)
+        elif self.provider == "mistralai":
+            return ChatMistralAI(model_name=self.model_name, temperature=self.temperature).with_structured_output(self.json_schema)
+        elif self.provider == 'google-genai':
+            return ChatGoogleGenerativeAI(model=self.model_name, temperature=self.temperature).with_structured_output(self.json_schema)
+        else: 
             raise ValueError('Unsupported model provider')
         
     def travel_plan(self, retriever, city, favorite_places, visitor_type, num_days, budget, callbacks=None):
@@ -278,7 +282,9 @@ class LLMService:
 if __name__ == '__main__':
     start_time = time.time()  # Start timer
     print("🚀 Travel Planner v2 - With Progress Tracking")
-
+    
+    load_dotenv()
+    
     parser = argparse.ArgumentParser(description="Generate a travel plan based on user input.")
     parser.add_argument('--city', type=str, required=True, help="User's travel City")
     parser.add_argument('--favorite_places', type=str, required=True, help="User's favorite types of places")
@@ -295,7 +301,8 @@ if __name__ == '__main__':
     vector_store = VectorStoreManager(documents=documents)
     retriever = vector_store.get_retriever()
     
-    llm_manager = LLMService("qwen-qwq-32b")
+    # llm_manager = LLMService("meta/llama-3.3-70b-instruct", provider='nvidia', temperature=0)
+    llm_manager = LLMService("mistral-large-latest", provider="mistralai")
 
     travel_plan = llm_manager.travel_plan(retriever, args.city, args.favorite_places, args.visitor_type, args.num_days, args.budget)
     
