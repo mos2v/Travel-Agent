@@ -7,7 +7,6 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
 from langchain.prompts import PromptTemplate
-from langchain.chat_models import init_chat_model
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from tqdm import tqdm
@@ -15,7 +14,6 @@ import argparse
 import time
 import pickle
 from langchain.callbacks.base import BaseCallbackHandler
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain_mistralai import ChatMistralAI
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
