@@ -9,3 +9,11 @@ documents.pkl
 test-client.html
 token_usage.json
 faiss_e5large_v1.0
+data/places_details.csv
+data/places_details1.csv
+data/places_details2.csv
+data/places_details_raw.csv
+data/places_details_raw1.csv
+data/places_details_raw2.csv
+place_details_checkpoint_merged.pkl
+place_ids_checkpoint_merged.pkl
