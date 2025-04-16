@@ -17,13 +17,12 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain_mistralai import ChatMistralAI
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
-
+from travel_plan_v2 import TravelItinerary
 # Define color scheme for different operation types
 PROGRESS_COLORS = {
-    'data_loading': '#4287f5',    # Blue for data loading
-    'processing': '#00cc66',      # Green for data processing
-    'vectorstore': '#9932CC',     # Purple for vector operations
-    'llm': '#FF8C00',             # Orange for LLM operations
+    'data_loading': '#13D4D4',    # Blue for data loading
+    'processing': '#00FF00',      # Green for data processing
+    'vectorstore': '#C71585',     # Purple for vector operations
     'default': '#00cc66',         # Default green
 }
 
@@ -159,7 +158,7 @@ class DocumentProcessor():
         
         
 class VectorStoreManager():
-    def __init__(self, documents: List[Document], provider=HuggingFaceEmbeddings, path='faiss_e5large_v1.0', embedding_model="intfloat/multilingual-e5-large-instruct"):
+    def __init__(self, documents: List[Document] | None, provider=HuggingFaceEmbeddings, path='faiss_e5large_v1.0', embedding_model="intfloat/multilingual-e5-large-instruct"):
         self.embeddings = provider(model_name=embedding_model)
         self.path = Path(path)
         self.documents = documents
@@ -429,10 +428,10 @@ if __name__ == '__main__':
     vector_store = VectorStoreManager(documents=documents)
     retriever = vector_store.get_retriever()
     
-    
-    # llm_manager = LLMService("meta/llama-3.3-70b-instruct", provider='nvidia', temperature=0)
-    llm_manager = LLMService("mistral-large-latest", provider="mistralai")
-    
+    llm_manager = LLMService("nvidia/llama-3.1-nemotron-ultra-253b-v1", provider="nvidia")
+    # llm_manager = LLMService("nvidia/llama-3.3-nemotron-super-49b-v1", provider="nvidia")
+    # llm_manager = LLMService("mistral-large-latest", provider="mistralai")
+    # llm_manager = LLMService("gemini-2.0-flash", provider="google-genai")
 
     travel_plan = llm_manager.travel_plan(retriever, args.city, args.favorite_places, args.visitor_type, args.num_days, args.budget)
     

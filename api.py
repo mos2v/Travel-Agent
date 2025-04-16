@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from src.travel_plan_v2 import DataLoader, DocumentProcessor, VectorStoreManager, LLMService
 from src.token_manager import TokenManager
 import traceback
-import os 
 import logging
 
 # Configure logging
@@ -25,15 +24,15 @@ async def lifespan(app: FastAPI):
     
     token_manager = TokenManager()
     
-    logger.info("🔁 Loading data...")
-    data = DataLoader()
+    # logger.info("🔁 Loading data...")
+    # data = DataLoader()
 
-    logger.info("📄 Processing documents...")
-    document_processor = DocumentProcessor(data.landmark_prices, data.places_api_data)
-    documents = document_processor.load_or_process_documents()
+    # logger.info("📄 Processing documents...")
+    # document_processor = DocumentProcessor(data.landmark_prices, data.places_api_data)
+    # documents = document_processor.load_or_process_documents()
 
     logger.info("🧠 Loading vector store...")
-    vector_store = VectorStoreManager(documents)
+    vector_store = VectorStoreManager()
     retriever = vector_store.get_retriever()
 
     logger.info("⚡ Initializing LLM...")

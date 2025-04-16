@@ -1,4 +1,3 @@
-import os
 import json
 import datetime
 from pathlib import Path
@@ -35,9 +34,9 @@ class TokenManager:
                     "priority": 2
                 },
                 "medium_priority_2": {
-                    "name": 'gemini-2.5-pro-exp-03-25',
-                    "provider": 'google-genai',
-                    "token_limit": 135000,
+                    "name": "mistral-large-latest",
+                    "provider": "mistralai",
+                    "token_limit": 3000000,
                     "priority": 3  
                 },
                 "medium_priority_3": {
@@ -47,9 +46,9 @@ class TokenManager:
                     "priority": 4,
                 },
                 "low_priority_1": {
-                    "name": "llama-3.2-90b-vision-preview",
-                    "provider": "groq",
-                    "token_limit": 246000,
+                    "name": 'gemini-2.5-pro-exp-03-25',
+                    "provider": 'google-genai',
+                    "token_limit": 135000,
                     "priority": 5
                 },
                 "low_priority_2": {
@@ -59,34 +58,31 @@ class TokenManager:
                     "priority": 6
                 },
                 "low_priority_3": {
-                    "name": "llama-3.3-70b-specdec",
-                    "provider": "groq",
-                    "token_limit": 96000,
+                    "name": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+                    "provider": "nvidia",
+                    "token_limit": 2000000,
                     "priority": 7
                 },
-                "low_priority_4": {
-                    "name": "llama-3.3-70b-versatile",
-                    "provider": "groq",
-                    "token_limit": 96000,
-                    "priority": 8
-                },
-                "low_priority_5": {
-                    "name": "qwen-qwq-32b",
-                    "provider": "groq",
-                    "token_limit": 1000000,
-                    "priority": 9
-                },
-                # "low_priority_6": {
-                #     "name": "deepseek-r1-distill-llama-70b",
+                # "low_priority_4": {
+                #     "name": "llama-3.3-70b-versatile",
+                #     "provider": "groq",
+                #     "token_limit": 96000,
+                #     "priority": 8
+                # },
+                # "low_priority_5": {
+                #     "name": "qwen-qwq-32b",
                 #     "provider": "groq",
                 #     "token_limit": 1000000,
-                #     "name": "meta/llama-3.3-70b-instruct",
-                #     "provider": "nvidia",
-                #     "token_limit": 1000000,
-                #     "priority": 10
+                #     "priority": 9
+                # },
+                # "low_priority_6": {
+                #     "name": "llama-3.3-70b-specdec",
+                #     "provider": "groq",
+                #     "token_limit": 96000,
+                #     "priority": 7
                 # },
                 # "fallback": {
-                #     "name": "meta/llama-3.1-450b-instruct",
+                #   "name": "meta/llama-3.3-70b-instruct",
                 #     "provider": "nvidia",
                 #     "token_limit": 1000000,
                 #     "priority": 7,
