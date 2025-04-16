@@ -18,14 +18,15 @@ tqdm==4.66.4
 pydantic==2.11.1
 
 # LangChain Core Framework
-langchain==0.3.21
-langchain-core==0.3.49
+langchain==0.3.23
+langchain-core==0.3.51
 langchain-community==0.3.20
 
 # LangChain integrations
 langchain-huggingface==0.1.2
 langchain-nvidia-ai-endpoints==0.3.9
 langchain-google-genai==2.1.2
+langchain-mistralai==0.2.10
 
 # Transformers for sentence embeddings
 sentence-transformers==4.0.1

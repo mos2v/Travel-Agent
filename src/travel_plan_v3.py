@@ -17,7 +17,6 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain_mistralai import ChatMistralAI
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
-from travel_plan_v2 import TravelItinerary
 # Define color scheme for different operation types
 PROGRESS_COLORS = {
     'data_loading': '#13D4D4',    # Blue for data loading
@@ -158,7 +157,7 @@ class DocumentProcessor():
         
         
 class VectorStoreManager():
-    def __init__(self, documents: List[Document] | None, provider=HuggingFaceEmbeddings, path='faiss_e5large_v1.0', embedding_model="intfloat/multilingual-e5-large-instruct"):
+    def __init__(self, documents: List[Document] = None, provider=HuggingFaceEmbeddings, path='faiss_e5large_v1.0', embedding_model="intfloat/multilingual-e5-large-instruct"):
         self.embeddings = provider(model_name=embedding_model)
         self.path = Path(path)
         self.documents = documents

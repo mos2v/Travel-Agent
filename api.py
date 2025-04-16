@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
-from src.travel_plan_v2 import DataLoader, DocumentProcessor, VectorStoreManager, LLMService
+from src.travel_plan_v3 import DataLoader, DocumentProcessor, VectorStoreManager, LLMService
 from src.token_manager import TokenManager
 import traceback
 import logging
@@ -24,15 +24,15 @@ async def lifespan(app: FastAPI):
     
     token_manager = TokenManager()
     
-    # logger.info("🔁 Loading data...")
-    # data = DataLoader()
+    logger.info("🔁 Loading data...")
+    data = DataLoader()
 
-    # logger.info("📄 Processing documents...")
-    # document_processor = DocumentProcessor(data.landmark_prices, data.places_api_data)
-    # documents = document_processor.load_or_process_documents()
+    logger.info("📄 Processing documents...")
+    document_processor = DocumentProcessor(data.landmark_prices, data.places_api_data)
+    documents = document_processor.load_or_process_documents()
 
     logger.info("🧠 Loading vector store...")
-    vector_store = VectorStoreManager()
+    vector_store = VectorStoreManager(documents)
     retriever = vector_store.get_retriever()
 
     logger.info("⚡ Initializing LLM...")
