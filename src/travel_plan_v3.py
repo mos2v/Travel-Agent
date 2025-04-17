@@ -17,13 +17,22 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain_mistralai import ChatMistralAI
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
+import os
+
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
+os.environ["LANGCHAIN_PROJECT"] = "Rag_travel_planner_v3.0.0"
+
+
+
 # Define color scheme for different operation types
 PROGRESS_COLORS = {
-    'data_loading': '#13D4D4',    # Blue for data loading
-    'processing': '#00FF00',      # Green for data processing
+    'data_loading': '#00FF00',    # Blue for data loading
+    'processing': '#13D4D4',      # Green for data processing
     'vectorstore': '#C71585',     # Purple for vector operations
     'default': '#00cc66',         # Default green
 }
+
 
 
 def pretty_progress_bar(iterable=None, total=None, desc=None, operation_type='default', **kwargs):
@@ -267,75 +276,292 @@ class LLMService:
         elif self.provider == 'google-genai':
             return ChatGoogleGenerativeAI(model=self.model_name, temperature=self.temperature).with_structured_output(self.json_schema)
         else: 
-            raise ValueError('Unsupported model provider')
-    
+                raise ValueError('Unsupported model provider')
+            
+            
     def _generate_enhanced_query(self, destination, interests, visitor_type):
         """
-        Generate an enhanced query that will retrieve more relevant documents from the vector store,
-        with special focus on dining options and food experiences.
+        Generate multiple focused queries to ensure balanced retrieval of different place types.
         
         Args:
             destination (str): The main destination city for the trip
             interests (list): List of specific interests like ["temples", "museums", "local cuisine"]
             visitor_type (str): Type of visitor (Egyptian, Foreign, etc.)
         Returns:
-            str: Enhanced query for better retrieval
+            dict: Dictionary with different specialized queries
         """
         # Format the interests as a comma-separated string
-        interests_str = ", ".join(interests)
+        if isinstance(interests, list):
+            interests_str = ", ".join(interests)
+        else:
+            interests_str = interests
         
-        # Add food-related keywords to interests if not already present
-        food_terms = ["restaurants", "cafes", "local cuisine", "dining", "food"]
-        food_interests = [term for term in food_terms if term not in interests_str.lower()]
-        if food_interests:
-            interests_str += f", {', '.join(food_interests)}"
+        # Create specialized queries for different categories
+        queries = {
+            "attractions": f"""
+                Find tourist attractions, historical landmarks, and museums ONLY in {destination}, Egypt.
+                Must be located within {destination} city limits. Exclude attractions from other cities.
+            """,
+            
+            "restaurants": f"""
+                Find restaurants, cafes, and dining options ONLY in {destination}, Egypt.
+                Must be located within {destination} city limits. Exclude places from other cities.
+            """,
+            
+            "historical_sites": f"""
+                Find historical sites and monuments ONLY in {destination}, Egypt.
+                Must be located within {destination} city limits. Exclude sites from other cities.
+            """,
+            
+            "prices": f"""
+                Find ticket prices and visiting hours for attractions in {destination}, Egypt.
+                Must be specifically for {destination} attractions.
+            """
+        }
         
-        # Construct a more specific query with keywords that match document content
-        query = f"""
-        Detailed travel plan for {destination} Egypt focusing on {interests_str}.
-        I need comprehensive information about:
+        # Add interests query only if interests were provided
+        if interests_str and interests_str != "popular attractions":
+            queries["interests"] = f"""
+                Find {interests_str} ONLY in {destination}, Egypt.
+                Must be located within {destination} city limits.
+            """
         
-        ATTRACTIONS:
-        1. Ticket prices for {visitor_type} visitors
-        2. Opening hours and visiting times for attractions
-        3. Cultural sites and museums in {destination}
-        
-        DINING OPTIONS (IMPORTANT):
-        1. Popular restaurants in {destination} with price range between 100-300 EGP
-        2. Coffee shops and cafes in {destination}
-        3. Traditional Egyptian dining establishments
-        4. Food markets and street food locations
-        5. Breakfast locations open in the morning
-        6. Lunch restaurants with good ratings
-        7. Dinner options that serve authentic Egyptian cuisine
-        8. Dessert places and sweet shops
-        9. Specialty food items in {destination}
-        10. Restaurant rating information and visitor reviews
-        11. Restaurants with Nile views or special settings
-        12. Seafood restaurants in {destination}
-        
-        Please include specific names, locations, price ranges, and opening hours for all food establishments.
-        """
-        return query.strip()
-    
+        # Clean up whitespace in all queries
+        for key in queries:
+            queries[key] = queries[key].strip()
+            
+        return queries
+
     def travel_plan(self, retriever, city, favorite_places, visitor_type, num_days, budget, callbacks=None):
         """
-        Extended version of travel_plan that accepts a callbacks parameter for token tracking.
+        Extended version of travel_plan that retrieves balanced content across categories 
+        while eliminating duplicates and ensuring city-specific results.
         """
         user_query = f'Plan a {num_days}-day trip in {city} with visits to {favorite_places}, and dining options.'
         
-        retriever_query = self._generate_enhanced_query(city, favorite_places, visitor_type)
+        # Standardize city name for consistent matching
+        city_lower = city.lower().strip()
+        
+        # Generate specialized queries for different types of places
+        query_dict = self._generate_enhanced_query(city, favorite_places, visitor_type)
+        
         print("🔍 Retrieving relevant documents...")
-        with pretty_progress_bar(total=1, desc="Vector search", operation_type='vectorstore') as pbar:
-            docs = retriever.invoke(retriever_query)
-            pbar.update(1)
-        print(f"✅ Retrieved {len(docs)} relevant documents")
+        all_docs = []
+        category_docs = {}
         
-        context_text = "\n".join([doc.page_content for doc in docs])
+        # Track document content hashes to avoid duplicates during retrieval
+        doc_content_hashes = set()
         
+        # City variations to check for proper filtering
+        city_variations = [city_lower, f"{city_lower},", f"{city_lower} governorate"]
+        
+        # Helper function to check if a document mentions the target city
+        def is_city_match(doc):
+            if not hasattr(doc, 'page_content'):
+                return False
+                
+            page_content_lower = doc.page_content.lower()
+            
+            # 1. Check if doc is from landmark_prices with matching city
+            if hasattr(doc, 'metadata') and doc.metadata.get('source') == 'landmark_prices':
+                # Extract Governorate/City from content
+                if "governorate: " in page_content_lower:
+                    doc_city = None
+                    lines = page_content_lower.split('\n')
+                    for line in lines:
+                        line = line.strip()
+                        if line.startswith("governorate: ") or line.startswith("governorate/city: "):
+                            doc_city = line.split(":", 1)[1].strip().lower()
+                            break
+                            
+                    if doc_city and any(var == doc_city for var in city_variations):
+                        return True
+                return False
+                
+            # 2. Check metadata for explicit city information
+            if hasattr(doc, 'metadata'):
+                # Check 'city' field
+                if 'city' in doc.metadata and isinstance(doc.metadata['city'], str):
+                    metadata_city = doc.metadata['city'].lower()
+                    if any(var in metadata_city for var in city_variations):
+                        return True
+                        
+                # Check 'formattedAddress' field
+                if 'formattedAddress' in doc.metadata and isinstance(doc.metadata['formattedAddress'], str):
+                    address = doc.metadata['formattedAddress'].lower()
+                    if any(var in address for var in city_variations):
+                        return True
+                        
+            # 3. Check content for city mention in specific context
+            # More strict content checking to avoid false positives
+            if "place location:" in page_content_lower:
+                location_line = None
+                lines = page_content_lower.split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith("place location:"):
+                        location_line = line
+                        break
+                        
+                if location_line and any(var in location_line for var in city_variations):
+                    return True
+                    
+            # Document doesn't match city criteria
+            return False
+        
+        # Helper function to get content hash for deduplication
+        def get_content_key(doc):
+            """Generate a unique string key for a document to use for deduplication"""
+            if not hasattr(doc, 'page_content'):
+                return None
+                
+            # Clean the content for more effective deduplication
+            content = doc.page_content.strip()
+            
+            # For landmark price documents, extract key identifying information
+            if hasattr(doc, 'metadata') and doc.metadata.get('source') == 'landmark_prices':
+                site_name = None
+                lines = content.split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith("Site:"):
+                        site_name = line.split(":", 1)[1].strip()
+                        break
+                if site_name:
+                    return f"landmark-{site_name}"
+                    
+            # For place documents, extract name as identifying information
+            if "place name:" in content.lower():
+                place_name = None
+                lines = content.split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if line.lower().startswith("place name:"):
+                        place_name = line.split(":", 1)[1].strip()
+                        break
+                if place_name:
+                    return f"place-{place_name}"
+                    
+            # Default to string hash of entire content
+            return f"content-{hash(content)}"
+        
+        with pretty_progress_bar(total=len(query_dict), desc="Vector search", operation_type='vectorstore') as pbar:
+            for category, query in query_dict.items():
+                # Get documents for each category
+                docs = retriever.invoke(query)
+                filtered_docs = []
+                
+                for doc in docs:
+                    content_key = get_content_key(doc)
+                    
+                    # Skip if we've seen this document before or it's invalid
+                    if not content_key or content_key in doc_content_hashes:
+                        continue
+                    
+                    # Only include documents that match the city
+                    if is_city_match(doc):
+                        doc_content_hashes.add(content_key)
+                        filtered_docs.append(doc)
+                
+                # Add category-specific filtered docs to results
+                if filtered_docs:
+                    category_docs[category] = filtered_docs
+                    all_docs.extend(filtered_docs)
+                
+                pbar.update(1)
+        
+        # Special handling for restaurant category - ensure we have enough restaurants
+        if 'restaurants' not in category_docs or len(category_docs.get('restaurants', [])) < 5:
+            # Create more specific restaurant queries for the city
+            restaurant_queries = [
+                f"restaurants in {city} Egypt",
+                f"cafes in {city} Egypt",
+                f"dining options in {city} Egypt"
+            ]
+            
+            print("🍽️ Finding additional dining options...")
+            with pretty_progress_bar(total=len(restaurant_queries), desc="Restaurant search", operation_type='vectorstore') as pbar:
+                for query in restaurant_queries:
+                    docs = retriever.invoke(query)
+                    
+                    for doc in docs:
+                        content_key = get_content_key(doc)
+                        
+                        # Skip if we've seen this document before or it's invalid
+                        if not content_key or content_key in doc_content_hashes:
+                            continue
+                        
+                        # Only include restaurants that match the city
+                        if is_city_match(doc):
+                            doc_content_hashes.add(content_key)
+                            
+                            # Add to restaurants category and all_docs
+                            if 'restaurants' not in category_docs:
+                                category_docs['restaurants'] = []
+                            category_docs['restaurants'].append(doc)
+                            all_docs.append(doc)
+                    
+                    pbar.update(1)
+        
+        # Organize documents with category labels for better context
+        organized_docs = []
+        
+        # Start with pricing information (landmark prices) - limited to 10 most relevant
+        landmark_docs = [doc for doc in all_docs if 
+                        hasattr(doc, 'metadata') and 
+                        doc.metadata.get('source') == 'landmark_prices']
+        
+        if landmark_docs:
+            organized_docs.append("--- TICKET PRICES AND VISITING HOURS ---")
+            for doc in landmark_docs[:10]:  # Limit to top 10
+                organized_docs.append(doc.page_content)
+        
+        # Add restaurant information - limited to 10 most relevant
+        restaurant_docs = category_docs.get('restaurants', [])
+        if restaurant_docs:
+            organized_docs.append("\n--- RESTAURANTS AND CAFES ---")
+            for doc in restaurant_docs[:10]: 
+                organized_docs.append(doc.page_content)
+        
+        # Add tourist attractions - limited to 10 most relevant using manual deduplication
+        # NOT using set() on Document objects since they're not hashable
+        attraction_docs = []
+        attraction_keys = set()
+        
+        # Combine attractions and historical sites
+        combined_attraction_docs = category_docs.get('attractions', []) + category_docs.get('historical_sites', [])
+        
+        # Manual deduplication
+        for doc in combined_attraction_docs:
+            content_key = get_content_key(doc)
+            if content_key and content_key not in attraction_keys:
+                attraction_keys.add(content_key)
+                attraction_docs.append(doc)
+        
+        if attraction_docs:
+            organized_docs.append("\n--- ATTRACTIONS AND HISTORICAL SITES ---")
+            for doc in attraction_docs[:10]:  # Limit to top 10
+                organized_docs.append(doc.page_content)
+        
+        # Add interest-specific places - limited to 5 most relevant
+        interest_docs = category_docs.get('interests', [])
+        if interest_docs:
+            organized_docs.append("\n--- PLACES MATCHING YOUR INTERESTS ---")
+            for doc in interest_docs[:5]:  # Limit to top 5
+                organized_docs.append(doc.page_content)
+        
+        # Combine organized documents into context
+        context_text = "\n\n".join(organized_docs)
+        
+        # Log statistics about retrieved documents
+        print(f"✅ Retrieved {len(doc_content_hashes)} unique documents for {city}:")
+        print(f"   - {len(landmark_docs)} pricing/visiting hours documents")
+        print(f"   - {len(restaurant_docs)} restaurant and cafe documents")
+        print(f"   - {len(attraction_docs)} attraction documents")
+        print(f"   - {len(interest_docs)} interest-specific documents")
         budget_conscious_prompt = PromptTemplate(
-            input_variables=["context", "user_query", "favorite_places", "visitor_type", "num_days", "budget"],
-            template="""You are an expert Egyptian travel planner with extensive knowledge of historical sites, cultural attractions, local cuisine, and hidden gems across Egypt. Your task is to create a personalized travel itinerary that STRICTLY ADHERES TO THE BUDGET CONSTRAINTS.
+            input_variables=["context", "user_query", "favorite_places", "visitor_type", "num_days", "budget", "city"],
+            template="""You are an expert Egyptian travel planner with extensive knowledge of historical sites, cultural attractions, local cuisine, and hidden gems across Egypt. Your task is to [...]
 
         ### AVAILABLE INFORMATION:
         {context}
@@ -344,38 +570,43 @@ class LLMService:
         {user_query}
 
         ### USER PREFERENCES:
+        - City/Destination: {city} (ONLY include places in this city)
         - Favorite types of places: {favorite_places}
         - Visitor category: {visitor_type} (Affects ticket pricing)
         - Trip duration: {num_days} days
         - MAXIMUM TOTAL BUDGET: {budget} EGP for the entire trip (THIS IS A HARD CONSTRAINT)
 
         ### DETAILED INSTRUCTIONS:
-        1. BUDGET MANAGEMENT (HIGHEST PRIORITY):
+        1. CITY RESTRICTION (HIGHEST PRIORITY):
+        - ONLY include attractions, restaurants, and activities in {city}
+        - DO NOT include any places from other cities
+        
+        2. BUDGET MANAGEMENT (HIGHEST PRIORITY):
         - The total cost MUST NOT EXCEED {budget} EGP under any circumstances
         - If necessary, REDUCE THE NUMBER OF ACTIVITIES per day to stay within budget
         - Allocate budget in this order of priority: (1) Must-see attractions, (2) Meals, (3) Secondary attractions
         - Track cumulative costs meticulously throughout the itinerary
         - Reserve 10% of budget for contingencies and transportation between sites
 
-        2. ATTRACTIONS SELECTION:
+        3. ATTRACTIONS SELECTION:
         - Prioritize attractions that match user's favorite place types AND provide the best value for money
         - For each attraction, include EXACT TICKET PRICES for {visitor_type} visitors
         - If an attraction is expensive but unmissable, compensate by selecting more affordable options for other activities
         - Consider free or low-cost alternatives when possible (e.g., viewpoints, markets, walking tours)
 
-        3. DINING RECOMMENDATIONS:
+        4. DINING RECOMMENDATIONS:
         - Include 3 meals per day with realistic costs
         - Balance between authentic experiences and budget constraints
         - For expensive destinations, suggest at least one affordable meal option per day
         - Include specific price estimates for each meal
 
-        4. TIME AND ACTIVITY MANAGEMENT:
+        5. TIME AND ACTIVITY MANAGEMENT:
         - If budget forces reduction in activities, focus on QUALITY over QUANTITY
         - Allow sufficient time at major attractions (2-3 hours minimum)
         - Group activities by geographic proximity to reduce transportation costs
         - Include at least one low-cost or free activity each day
 
-        5. BUDGET BREAKDOWN:
+        6. BUDGET BREAKDOWN:
         - At the end of each day's itinerary, provide a running total of expenses
         - Clearly itemize all costs in the itinerary
         - If assumptions are made about costs, they should be CONSERVATIVE estimates
@@ -394,7 +625,8 @@ class LLMService:
             favorite_places=favorite_places,
             visitor_type=visitor_type,
             num_days=num_days,
-            budget=budget
+            budget=budget,
+            city=city
         )
         
         print("🧠 Generating travel itinerary...")
@@ -427,10 +659,10 @@ if __name__ == '__main__':
     vector_store = VectorStoreManager(documents=documents)
     retriever = vector_store.get_retriever()
     
-    llm_manager = LLMService("nvidia/llama-3.1-nemotron-ultra-253b-v1", provider="nvidia")
+    # llm_manager = LLMService("nvidia/llama-3.1-nemotron-ultra-253b-v1", provider="nvidia")
     # llm_manager = LLMService("nvidia/llama-3.3-nemotron-super-49b-v1", provider="nvidia")
     # llm_manager = LLMService("mistral-large-latest", provider="mistralai")
-    # llm_manager = LLMService("gemini-2.0-flash", provider="google-genai")
+    llm_manager = LLMService("gemini-2.0-flash", provider="google-genai")
 
     travel_plan = llm_manager.travel_plan(retriever, args.city, args.favorite_places, args.visitor_type, args.num_days, args.budget)
     
