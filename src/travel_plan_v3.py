@@ -518,14 +518,14 @@ class LLMService:
         
         if landmark_docs:
             organized_docs.append("--- TICKET PRICES AND VISITING HOURS ---")
-            for doc in landmark_docs[:10]:  # Limit to top 10
+            for doc in landmark_docs[:10]:  
                 organized_docs.append(doc.page_content)
         
         # Add restaurant information - limited to 10 most relevant
         restaurant_docs = category_docs.get('restaurants', [])
         if restaurant_docs:
             organized_docs.append("\n--- RESTAURANTS AND CAFES ---")
-            for doc in restaurant_docs[:10]: 
+            for doc in restaurant_docs[:12]: 
                 organized_docs.append(doc.page_content)
         
         # Add tourist attractions - limited to 10 most relevant using manual deduplication
@@ -552,7 +552,7 @@ class LLMService:
         interest_docs = category_docs.get('interests', [])
         if interest_docs:
             organized_docs.append("\n--- PLACES MATCHING YOUR INTERESTS ---")
-            for doc in interest_docs[:5]:  # Limit to top 5
+            for doc in interest_docs[:8]:  # Limit to top 5
                 organized_docs.append(doc.page_content)
         
         # Combine organized documents into context
@@ -564,63 +564,79 @@ class LLMService:
         print(f"   - {len(restaurant_docs)} restaurant and cafe documents")
         print(f"   - {len(attraction_docs)} attraction documents")
         print(f"   - {len(interest_docs)} interest-specific documents")
+        
+        
         budget_conscious_prompt = PromptTemplate(
             input_variables=["context", "user_query", "favorite_places", "visitor_type", "num_days", "budget", "city"],
-            template="""You are an expert Egyptian travel planner with extensive knowledge of historical sites, cultural attractions, local cuisine, and hidden gems across Egypt. Your task is to [...]
+            template="""You are an expert Egyptian travel planner with extensive knowledge of historical sites, cultural attractions, local cuisine, and hidden gems across Egypt. Your task is to create a detailed, balanced {num_days}-day itinerary for {visitor_type} visitors to {city}, Egypt.
+            
+            ### AVAILABLE INFORMATION:
+            {context}
 
-        ### AVAILABLE INFORMATION:
-        {context}
+            ### USER REQUEST:
+            {user_query}
 
-        ### USER REQUEST:
-        {user_query}
+            ### USER PREFERENCES:
+            - City/Destination: {city} (ONLY include places in this city)
+            - Favorite types of places: {favorite_places}
+            - Visitor category: {visitor_type} (Affects ticket pricing)
+            - Trip duration: {num_days} days
+            - MAXIMUM TOTAL BUDGET: {budget} EGP for the entire trip (THIS IS A HARD CONSTRAINT)
 
-        ### USER PREFERENCES:
-        - City/Destination: {city} (ONLY include places in this city)
-        - Favorite types of places: {favorite_places}
-        - Visitor category: {visitor_type} (Affects ticket pricing)
-        - Trip duration: {num_days} days
-        - MAXIMUM TOTAL BUDGET: {budget} EGP for the entire trip (THIS IS A HARD CONSTRAINT)
+            ### DETAILED INSTRUCTIONS:
+            1. CITY RESTRICTION (HIGHEST PRIORITY):
+            - ONLY include attractions, restaurants, and activities in {city}
+            - DO NOT include any places from other cities or regions
+            - Verify each recommendation against the provided context data
 
-        ### DETAILED INSTRUCTIONS:
-        1. CITY RESTRICTION (HIGHEST PRIORITY):
-        - ONLY include attractions, restaurants, and activities in {city}
-        - DO NOT include any places from other cities
-        
-        2. BUDGET MANAGEMENT (HIGHEST PRIORITY):
-        - The total cost MUST NOT EXCEED {budget} EGP under any circumstances
-        - Allocate budget in this order of priority: (1) Must-see attractions, (2) Meals, (3) Secondary attractions
-        - Track cumulative costs meticulously throughout the itinerary
+            2. BALANCE OF ACTIVITIES (VERY IMPORTANT):
+            - Include a balanced mix of attractions AND dining experiences each day
+            - Each day must include:
+            * 1-2 major attractions or historical sites
+            * 3 meals at different restaurants/cafes (breakfast, lunch, dinner)
+            * At least one activity related to user's specified favorite places
 
-        3. ATTRACTIONS SELECTION:
-        - Prioritize attractions that match user's favorite place types AND provide the best value for money
-        - For each attraction, include EXACT TICKET PRICES for {visitor_type} visitors
-        - If an attraction is expensive but unmissable, compensate by selecting more affordable options for other activities
-        - Consider free or low-cost alternatives when possible (e.g., viewpoints, markets, walking tours)
+            3. BUDGET MANAGEMENT (HIGHEST PRIORITY):
+            - The total cost MUST NOT EXCEED {budget} EGP under any circumstances
+            - Use EXACT TICKET PRICES from the "TICKET PRICES AND VISITING HOURS" section when available
+            - Use realistic price estimates for restaurants based on the "RESTAURANTS AND CAFES" section
+            - Reserve 10% of the budget for transportation between sites
+            - If the budget is tight, prioritize must-see attractions over secondary experiences
 
-        4. DINING RECOMMENDATIONS:
-        - Include 3 meals per day with realistic costs
-        - Balance between authentic experiences and budget constraints
-        - For expensive destinations, suggest at least one affordable meal option per day
-        - Include specific price estimates for each meal
+            4. ATTRACTIONS SELECTION:
+            - Select attractions directly mentioned in the retrieved context
+            - Use the exact ticket prices provided for {visitor_type} visitors
+            - Consider free attractions (those with 0 EGP ticket price) to maximize budget value
+            - Plan visits according to the provided opening hours/visiting times
+            - Group nearby attractions to minimize transportation needs
 
-        5. TIME AND ACTIVITY MANAGEMENT:
-        - If budget forces reduction in activities, focus on QUALITY over QUANTITY
-        - Allow sufficient time at major attractions (2-3 hours minimum)
-        - Group activities by geographic proximity to reduce transportation costs
-        - Include at least one low-cost or free activity each day
+            5. DINING RECOMMENDATIONS:
+            - Select restaurants and cafes specifically mentioned in the "RESTAURANTS AND CAFES" section
+            - Include estimated meal costs based on price information provided (or conservative estimates)
+            - Vary dining experiences between traditional Egyptian cuisine and other options
+            - Consider price levels (moderate, inexpensive) noted in the restaurant data
 
-        6. BUDGET BREAKDOWN:
-        - At the end of each day's itinerary, provide a running total of expenses
-        - Clearly itemize all costs in the itinerary
-        - If assumptions are made about costs, they should be CONSERVATIVE estimates
+            6. DAILY STRUCTURE:
+            - Organize each day in chronological order (morning to evening)
+            - Allow sufficient time at major attractions (2-3 hours minimum)
+            - Include specific visit times that align with attraction opening hours
+            - Account for travel time between locations
 
-        DO NOT include hotels or accommodations in your plan.
-        DO NOT exceed the total budget provided - this is a strict requirement.
-        DO NOT recommend places without confirmed existence in the provided context.
-        DO REDUCE the number of activities rather than exceeding the budget.
+            7. BUDGET TRACKING:
+            - Itemize each expense (attraction tickets, meals, etc.)
+            - Provide a daily subtotal at the end of each day
+            - Maintain a running cumulative total throughout the itinerary
+            - Ensure the final total stays under {budget} EGP
 
-        Your response must follow the structured format required by the JSON schema, with complete details for each day's activities and accurate cost tracking.
-        """)
+            DO NOT include hotels or accommodations in your plan.
+            DO NOT exceed the total budget provided - this is a strict requirement.
+            DO NOT recommend places not listed in the provided context.
+            DO NOT include places from cities other than {city}.
+            DO include a diverse mix of attractions and dining options.
+
+            Your response must follow the structured format required by the JSON schema, with complete details for each day's activities and accurate cost tracking.
+            """
+        )
         
         prompt = budget_conscious_prompt.format(
             context=context_text,
@@ -665,8 +681,12 @@ if __name__ == '__main__':
     # llm_manager = LLMService("nvidia/llama-3.1-nemotron-ultra-253b-v1", provider="nvidia")
     # llm_manager = LLMService("nvidia/llama-3.3-nemotron-super-49b-v1", provider="nvidia")
     # llm_manager = LLMService("mistral-large-latest", provider="mistralai")
-    llm_manager = LLMService("gemini-2.0-flash", provider="google-genai")
-
+    # llm_manager = LLMService("meta/llama-4-maverick-17b-128e-instruct", provider='nvidia')
+    
+    llm_manager = LLMService("gemini-2.0-flash", provider="google-genai", temperature=0.4)
+    
+    # llm_manager = LLMService("meta-llama/llama-4-maverick-17b-128e-instruct", provider='groq')
+    
     travel_plan = llm_manager.travel_plan(retriever, args.city, args.favorite_places, args.visitor_type, args.num_days, args.budget)
     
     print("\n📋 Generated Travel Plan:")
