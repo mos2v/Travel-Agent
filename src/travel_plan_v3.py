@@ -18,6 +18,7 @@ from langchain_mistralai import ChatMistralAI
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os
+import torch
 
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
@@ -167,7 +168,11 @@ class DocumentProcessor():
         
 class VectorStoreManager():
     def __init__(self, documents: List[Document] = None, provider=HuggingFaceEmbeddings, path='faiss_e5large_v1.0', embedding_model="intfloat/multilingual-e5-large-instruct"):
-        self.embeddings = provider(model_name=embedding_model)
+        self.embeddings = provider(
+            model_name=embedding_model,
+            model_kwargs={"device": "cuda" if torch.cuda.is_available() else "cpu"},
+            encode_kwargs={'normalize_embeddings': True}
+            )
         self.path = Path(path)
         self.documents = documents
         
@@ -583,10 +588,8 @@ class LLMService:
         
         2. BUDGET MANAGEMENT (HIGHEST PRIORITY):
         - The total cost MUST NOT EXCEED {budget} EGP under any circumstances
-        - If necessary, REDUCE THE NUMBER OF ACTIVITIES per day to stay within budget
         - Allocate budget in this order of priority: (1) Must-see attractions, (2) Meals, (3) Secondary attractions
         - Track cumulative costs meticulously throughout the itinerary
-        - Reserve 10% of budget for contingencies and transportation between sites
 
         3. ATTRACTIONS SELECTION:
         - Prioritize attractions that match user's favorite place types AND provide the best value for money
