@@ -22,7 +22,7 @@ class TokenManager:
         if models_config is None:
             self.models_config = {
                 "high_priority": {
-                    "name": "gemini-2.5-flash-preview-04-17",
+                    "name": "gemini-2.0-flash",
                     "provider": "google-genai",
                     "token_limit": 1000000,
                     "daily_request_limit": 500,  
@@ -30,7 +30,7 @@ class TokenManager:
                     "priority": 1
                 },
                 "medium_priority_1": {
-                    "name": "gemini-2.0-flash",
+                    "name": "gemini-2.5-flash-preview-04-17",
                     "provider": "google-genai",
                     "token_limit": 1000000,
                     "daily_request_limit": 1500,  
