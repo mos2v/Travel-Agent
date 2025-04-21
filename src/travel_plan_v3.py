@@ -221,7 +221,7 @@ class VectorStoreManager():
                 "score_threshold": 0.5})
 
 class LLMService:
-    def __init__(self, model_name, provider='groq', temperature: float = 0):
+    def __init__(self, model_name, provider='groq', temperature: float = 0.0):
         self.provider = provider
         self.model_name = model_name
         self.temperature = temperature
@@ -267,7 +267,7 @@ class LLMService:
             },
             "required": ["days", "total_approximate_cost"]
         }
-        print(f"🔄 Initializing LLM: {model_name} via {provider}")
+        print(f"🔄 Initializing LLM: {model_name} via {provider} with temperature {temperature}")
         self.llm = self.initialize_llm()
         print(f"✅ LLM ready: {model_name}")
         
@@ -657,7 +657,7 @@ class LLMService:
         return self.llm.invoke(prompt, config={"callbacks": callbacks})
 
 if __name__ == '__main__':
-    start_time = time.time()  # Start timer
+    start_time = time.time() 
     print("🚀 Travel Planner v3")
     
     load_dotenv()
@@ -682,9 +682,8 @@ if __name__ == '__main__':
     # llm_manager = LLMService("nvidia/llama-3.3-nemotron-super-49b-v1", provider="nvidia")
     # llm_manager = LLMService("mistral-large-latest", provider="mistralai")
     # llm_manager = LLMService("meta/llama-4-maverick-17b-128e-instruct", provider='nvidia')
-    
     llm_manager = LLMService("gemini-2.0-flash", provider="google-genai", temperature=0.4)
-    
+    # llm_manager = LLMService("gemini-2.5-flash-preview-04-17", provider="google-genai", temperature=0.4)
     # llm_manager = LLMService("meta-llama/llama-4-maverick-17b-128e-instruct", provider='groq')
     
     travel_plan = llm_manager.travel_plan(retriever, args.city, args.favorite_places, args.visitor_type, args.num_days, args.budget)

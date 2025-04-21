@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from src.travel_plan_v3 import DataLoader, DocumentProcessor, VectorStoreManager, LLMService
@@ -14,7 +14,6 @@ logger = logging.getLogger("TravelAPI")
 
 # Initialize token manager
 token_manager = None
-
 
 
 @asynccontextmanager
@@ -38,10 +37,11 @@ async def lifespan(app: FastAPI):
     logger.info("⚡ Initializing LLM...")
     
     model_name, provider = token_manager.get_current_model()
+    temperature = token_manager.get_model_temperature()
     
-    llm_manager = LLMService(model_name, provider=provider)
+    llm_manager = LLMService(model_name, provider=provider, temperature=temperature)
     
-    logger.info(f"✅ App initialized with model: {model_name} (provider: {provider})")
+    logger.info(f"✅ App initialized with model: {model_name} (provider: {provider}, temperature: {temperature})")
 
     yield
     logger.info("🔻 Shutting down...")
@@ -70,6 +70,7 @@ class TravelPlanRequest(BaseModel):
     visitor_type: str
     num_days: str
     budget: str
+    temperature: float = Field(default=None, description="Optional temperature parameter for model generation")
 
 @app.post("/api/travel-plan")
 async def generate_travel_plan(request: TravelPlanRequest):
@@ -80,11 +81,18 @@ async def generate_travel_plan(request: TravelPlanRequest):
         # Check if we need to switch models before processing
         current_model_name, current_provider = token_manager.get_current_model()
         
-        # If the current model doesn't match the LLM manager's model, update it
+        # Get the default temperature for the current model
+        default_temperature = token_manager.get_model_temperature()
+        
+        # Use request temperature if provided, otherwise use default
+        temperature = request.temperature if request.temperature is not None else default_temperature
+        
+        # If the current model doesn't match the LLM manager's model or temperature changed, update it
         if (llm_manager.model_name != current_model_name or 
-            llm_manager.provider != current_provider):
-            logger.info(f"🔄 Switching model to {current_model_name} (provider: {current_provider})")
-            llm_manager = LLMService(current_model_name, provider=current_provider)
+            llm_manager.provider != current_provider or
+            llm_manager.temperature != temperature):
+            logger.info(f"🔄 Switching model to {current_model_name} (provider: {current_provider}, temperature: {temperature})")
+            llm_manager = LLMService(current_model_name, provider=current_provider, temperature=temperature)
         
         # Get the callback handler for token tracking
         callback_handler = token_manager.get_callback_handler()
@@ -124,3 +132,20 @@ async def get_usage_stats():
         return {"error": "Token manager not initialized"}
     
     return token_manager.get_usage_stats()
+
+@app.post("/api/set-temperature")
+async def set_model_temperature(model_name: str = Query(..., description="Model name to update temperature for"), 
+                               temperature: float = Query(..., description="Temperature value (0.0-1.0)")):
+    """Endpoint to set the temperature for a specific model."""
+    global token_manager
+    if token_manager is None:
+        return {"error": "Token manager not initialized"}
+    
+    # Ensure temperature is within valid range
+    temperature = max(0.0, min(1.0, temperature))
+    
+    success = token_manager.set_model_temperature(model_name, temperature)
+    if success:
+        return {"status": "success", "message": f"Temperature for model {model_name} set to {temperature}"}
+    else:
+        raise HTTPException(status_code=404, detail=f"Model {model_name} not found")

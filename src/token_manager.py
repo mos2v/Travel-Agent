@@ -22,69 +22,91 @@ class TokenManager:
         if models_config is None:
             self.models_config = {
                 "high_priority": {
-                    "name": "gemini-2.0-flash",
+                    "name": "gemini-2.5-flash-preview-04-17",
                     "provider": "google-genai",
-                    "token_limit": 4000000,
+                    "token_limit": 1000000,
+                    "daily_request_limit": 500,  
+                    "temperature": 0.0, 
                     "priority": 1
                 },
                 "medium_priority_1": {
-                    "name": "gemini-2.0-flash-lite",
+                    "name": "gemini-2.0-flash",
                     "provider": "google-genai",
-                    "token_limit": 4000000,
+                    "token_limit": 1000000,
+                    "daily_request_limit": 1500,  
+                    "temperature": 0.0,  
                     "priority": 2
                 },
                 "medium_priority_2": {
-                    "name": "mistral-large-latest",
-                    "provider": "mistralai",
-                    "token_limit": 3000000,
+                    "name": "gemini-2.0-flash-lite",
+                    "provider": "google-genai",
+                    "token_limit": 4000000,
+                    "daily_request_limit": 1500, 
+                    "temperature": 0.1,
                     "priority": 3  
                 },
                 "medium_priority_3": {
-                    "name": "gemini-2.5-pro-preview-03-25",
-                    "provider": 'google-genai',
-                    "token_limit": 135000,
+                    "name": "mistral-large-latest",
+                    "provider": "mistralai",
+                    "token_limit": 2000000,
+                    "daily_request_limit": None, 
+                    "temperature": 0.2,  
                     "priority": 4,
                 },
                 "low_priority_1": {
-                    "name": 'gemini-2.5-pro-exp-03-25',
+                    "name": "gemini-2.5-pro-preview-03-25",
                     "provider": 'google-genai',
                     "token_limit": 135000,
+                    "daily_request_limit": 25,  
+                    "temperature": 0,  
                     "priority": 5
                 },
                 "low_priority_2": {
-                    "name":"gemini-2.0-flash-exp-image-generation", 
-                    "provider":"google-genai",
+                    "name": 'gemini-2.5-pro-exp-03-25',
+                    "provider": 'google-genai',
                     "token_limit": 135000,
+                    "daily_request_limit": 25,  
+                    "temperature": 0, 
                     "priority": 6
                 },
                 "low_priority_3": {
-                    "name": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-                    "provider": "nvidia",
-                    "token_limit": 2000000,
+                    "name":"gemini-2.0-flash-exp-image-generation", 
+                    "provider":"google-genai",
+                    "token_limit": 135000,
+                    "daily_request_limit": 25, 
+                    "temperature": 0,  
                     "priority": 7
                 },
-                # "low_priority_4": {
+                "low_priority_4": {
+                    "name": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+                    "provider": "nvidia",
+                    "token_limit": None,  
+                    "daily_request_limit": None,  #
+                    "temperature": 0,
+                    "priority": 8
+                },
+                # "low_priority_5": {
                 #     "name": "llama-3.3-70b-versatile",
                 #     "provider": "groq",
                 #     "token_limit": 96000,
-                #     "priority": 8
-                # },
-                # "low_priority_5": {
-                #     "name": "qwen-qwq-32b",
-                #     "provider": "groq",
-                #     "token_limit": 1000000,
+                #     "daily_request_limit": None,
+                #     "temperature": 0.0,
                 #     "priority": 9
                 # },
                 # "low_priority_6": {
                 #     "name": "llama-3.3-70b-specdec",
                 #     "provider": "groq",
                 #     "token_limit": 96000,
+                #     "daily_request_limit": None,
+                #     "temperature": 0.0,
                 #     "priority": 7
                 # },
                 # "fallback": {
                 #   "name": "meta/llama-3.3-70b-instruct",
                 #     "provider": "nvidia",
-                #     "token_limit": 1000000,
+                #     "token_limit": None,
+                #     "daily_request_limit": None,
+                #     "temperature": 0.2,
                 #     "priority": 7,
                 # } 
             }
@@ -110,13 +132,17 @@ class TokenManager:
             return {
                 "last_updated": self._get_today_date(),
                 "current_model_id": self._get_highest_priority_model_id(),
-                "model_usage": {}
+                "model_usage": {},
+                "request_counts": {}  # Track request counts separately
             }
             
         try:
             with open(self.storage_path, "r") as f:
                 data = json.load(f)
                 
+            # Ensure request_counts exists
+            if "request_counts" not in data:
+                data["request_counts"] = {}
                 
             # Check if we need to reset for a new day
             today = self._get_today_date()
@@ -124,6 +150,8 @@ class TokenManager:
                 data['last_updated'] = today
                 # Reset current model to highest priority model for a new day
                 data['current_model_id'] = self._get_highest_priority_model_id()
+                # Reset request counts for a new day
+                data['request_counts'] = {}
                 
             return data
         except Exception as e:
@@ -131,7 +159,8 @@ class TokenManager:
             return {
                 "last_updated": self._get_today_date(),
                 "current_model_id": self._get_highest_priority_model_id(),
-                "model_usage": {}
+                "model_usage": {},
+                "request_counts": {}
             }
             
             
@@ -159,8 +188,11 @@ class TokenManager:
         
         # Calculate total tokens used in this request
         total_tokens = 0
-        current_model_name = self.get_current_model()[0]
+        current_model_name, current_provider = self.get_current_model()
         current_model_usage = 0
+        
+        # Update request count for the current model
+        self._update_request_count(current_model_name)
         
         for model, stats in usage_metadata.items():
             # Track usage per model
@@ -200,43 +232,81 @@ class TokenManager:
             "total_tokens": total_tokens,
             "current_model_usage": current_model_usage
         }
+    
+    def _update_request_count(self, model_name: str) -> None:
+        """
+        Update request count for the specified model.
+        """
+        today = self._get_today_date()
+        
+        # Initialize request counts structure if needed
+        if "request_counts" not in self.usage_data:
+            self.usage_data["request_counts"] = {}
+        
+        if model_name not in self.usage_data["request_counts"]:
+            self.usage_data["request_counts"][model_name] = {}
+        
+        if today not in self.usage_data["request_counts"][model_name]:
+            self.usage_data["request_counts"][model_name][today] = 0
+        
+        # Increment request count
+        self.usage_data["request_counts"][model_name][today] += 1
         
     def _check_and_switch_model(self) -> None:
         """
-        Check token usage for each model and switch to a lower priority model
-        if the current model exceeds its token limit.
+        Check token usage and request counts for each model and switch to a lower priority model
+        if the current model exceeds its token limit or request limit.
         """
         today = self._get_today_date()
         current_model_id = self.usage_data["current_model_id"]
         current_model = self.models_config[current_model_id]
         current_model_name = current_model["name"]
         
-        # # Skip check for NVIDIA provider models (unlimited tokens)
-        # if current_model["provider"] == "nvidia":
-        #     return
+        # Skip check for NVIDIA provider models (unlimited tokens and requests)
+        if current_model["provider"] == "nvidia":
+            return
         
         # Get current model's usage
         current_usage = 0
         if current_model_name in self.usage_data["model_usage"] and today in self.usage_data["model_usage"][current_model_name]:
             current_usage = self.usage_data["model_usage"][current_model_name][today]["total_tokens"]
         
-        # Check if current model exceeded its token limit
-        if current_model["token_limit"] is not None and current_usage >= current_model["token_limit"]:
+        # Get current model's request count
+        current_request_count = 0
+        if (current_model_name in self.usage_data.get("request_counts", {}) and 
+            today in self.usage_data["request_counts"][current_model_name]):
+            current_request_count = self.usage_data["request_counts"][current_model_name][today]
+        
+        # Check if current model exceeded its token limit or request limit
+        token_limit_exceeded = (current_model["token_limit"] is not None and 
+                               current_usage >= current_model["token_limit"])
+        
+        request_limit_exceeded = (current_model["daily_request_limit"] is not None and 
+                                 current_request_count >= current_model["daily_request_limit"])
+        
+        if token_limit_exceeded or request_limit_exceeded:
             # Find the next eligible model
             next_model_id = self._find_next_eligible_model(current_model_id)
             
             if next_model_id != current_model_id:
                 self.usage_data["current_model_id"] = next_model_id
                 next_model = self.models_config[next_model_id]
-                logger.warning(
-                    f"Model {current_model_name} exceeded its token limit ({current_usage}/{current_model['token_limit']}). "
-                    f"Switching to {next_model['name']} (provider: {next_model['provider']})"
-                )
+                
+                if token_limit_exceeded:
+                    logger.warning(
+                        f"Model {current_model_name} exceeded its token limit ({current_usage}/{current_model['token_limit']}). "
+                        f"Switching to {next_model['name']} (provider: {next_model['provider']})"
+                    )
+                else:  # request_limit_exceeded
+                    logger.warning(
+                        f"Model {current_model_name} exceeded its request limit ({current_request_count}/{current_model['daily_request_limit']}). "
+                        f"Switching to {next_model['name']} (provider: {next_model['provider']})"
+                    )
             
     def _find_next_eligible_model(self, current_model_id: str) -> str:
         """
         Find the next eligible model based on priority.
-        An eligible model is one that hasn't exceeded its token limit.
+        An eligible model is one that hasn't exceeded its token limit or request limit.
         If all models have exceeded their limits, return the highest priority model.
         """
         today = self._get_today_date()
@@ -249,22 +319,34 @@ class TokenManager:
             key=lambda x: x[1]["priority"]
         )
         
-        # Check each model to see if it's under its token limit
+        # Check each model to see if it's under its token limit and request limit
         for model_id, config in eligible_models:
-            # NVIDIA models are always eligible (no token limit)
+            model_name = config["name"]
+            
+            # NVIDIA models are always eligible (no token limit, no request limit)
             if config["provider"] == "nvidia":
                 return model_id
             
-            # Check token usage for non-NVIDIA models
-            if config["token_limit"] is None:
+            # Check if model has unlimited tokens and requests
+            if config["token_limit"] is None and config["daily_request_limit"] is None:
                 return model_id
-                
-            model_name = config["name"]
-            current_usage = 0
+            
+            # Check token usage
+            token_usage = 0
             if model_name in self.usage_data["model_usage"] and today in self.usage_data["model_usage"][model_name]:
-                current_usage = self.usage_data["model_usage"][model_name][today]["total_tokens"]
-                
-            if current_usage < config["token_limit"]:
+                token_usage = self.usage_data["model_usage"][model_name][today]["total_tokens"]
+            
+            # Check request count
+            request_count = 0
+            if (model_name in self.usage_data.get("request_counts", {}) and 
+                today in self.usage_data["request_counts"][model_name]):
+                request_count = self.usage_data["request_counts"][model_name][today]
+            
+            # Check if model is under both token and request limits
+            token_limit_ok = config["token_limit"] is None or token_usage < config["token_limit"]
+            request_limit_ok = config["daily_request_limit"] is None or request_count < config["daily_request_limit"]
+            
+            if token_limit_ok and request_limit_ok:
                 return model_id
         
         # If no eligible model found, stay with the current one
@@ -278,6 +360,42 @@ class TokenManager:
         model_id = self.usage_data["current_model_id"]
         model_config = self.models_config[model_id]
         return model_config["name"], model_config["provider"]
+    
+    def get_model_temperature(self, model_name: Optional[str] = None) -> float:
+        """
+        Get the temperature setting for the specified model.
+        If no model is specified, returns the temperature for the current model.
+        """
+        if model_name is None:
+            model_id = self.usage_data["current_model_id"]
+            return self.models_config[model_id].get("temperature", 0.0)
+        
+        # Find the model by name
+        for model_id, config in self.models_config.items():
+            if config["name"] == model_name:
+                return config.get("temperature", 0.0)
+                
+        # Default temperature if model not found
+        return 0.0
+    
+    def set_model_temperature(self, model_name: str, temperature: float) -> bool:
+        """
+        Set the temperature for the specified model.
+        Returns True if successful, False if model not found.
+        """
+        # Ensure temperature is within valid range
+        temperature = max(0.0, min(1.0, temperature))
+        
+        # Find the model by name and update its temperature
+        for model_id, config in self.models_config.items():
+            if config["name"] == model_name:
+                self.models_config[model_id]["temperature"] = temperature
+                self._save_usage_data()
+                logger.info(f"Temperature for model {model_name} set to {temperature}")
+                return True
+                
+        logger.warning(f"Model {model_name} not found, temperature not updated")
+        return False
     
     def get_callback_handler(self) -> UsageMetadataCallbackHandler:
         """Get the callback handler for tracking token usage."""
@@ -299,18 +417,32 @@ class TokenManager:
         model_stats = {}
         for model_id, config in self.models_config.items():
             model_name = config["name"]
-            usage = 0
-            if model_name in self.usage_data["model_usage"] and today in self.usage_data["model_usage"][model_name]:
-                usage = self.usage_data["model_usage"][model_name][today]["total_tokens"]
             
-            limit = config["token_limit"]
-            limit_str = "Unlimited" if limit is None else str(limit)
+            # Get token usage
+            token_usage = 0
+            if model_name in self.usage_data["model_usage"] and today in self.usage_data["model_usage"][model_name]:
+                token_usage = self.usage_data["model_usage"][model_name][today]["total_tokens"]
+            
+            # Get request count
+            request_count = 0
+            if (model_name in self.usage_data.get("request_counts", {}) and 
+                today in self.usage_data["request_counts"][model_name]):
+                request_count = self.usage_data["request_counts"][model_name][today]
+            
+            token_limit = config["token_limit"]
+            token_limit_str = "Unlimited" if token_limit is None else str(token_limit)
+            
+            request_limit = config.get("daily_request_limit")
+            request_limit_str = "Unlimited" if request_limit is None else str(request_limit)
             
             model_stats[model_id] = {
                 "name": model_name,
                 "provider": config["provider"],
-                "token_limit": limit_str,
-                "usage_today": usage,
+                "token_limit": token_limit_str,
+                "usage_today": token_usage,
+                "daily_request_limit": request_limit_str,
+                "requests_today": request_count,
+                "temperature": config.get("temperature", 0.0),
                 "priority": config["priority"]
             }
         
@@ -321,13 +453,9 @@ class TokenManager:
             "current_model": {
                 "name": current_model["name"],
                 "provider": current_model["provider"],
-                "token_limit": "Unlimited" if current_model["token_limit"] is None else current_model["token_limit"]
+                "token_limit": "Unlimited" if current_model["token_limit"] is None else current_model["token_limit"],
+                "daily_request_limit": "Unlimited" if current_model.get("daily_request_limit") is None else current_model["daily_request_limit"],
+                "temperature": current_model.get("temperature", 0.0)
             },
             "models": model_stats
-        }        
-            
-              
-
-        
-        
-        
+        }
