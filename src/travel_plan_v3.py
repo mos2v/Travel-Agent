@@ -565,10 +565,9 @@ class LLMService:
         print(f"   - {len(attraction_docs)} attraction documents")
         print(f"   - {len(interest_docs)} interest-specific documents")
         
-        
         budget_conscious_prompt = PromptTemplate(
             input_variables=["context", "user_query", "favorite_places", "visitor_type", "num_days", "budget", "city"],
-            template="""You are an expert Egyptian travel planner with extensive knowledge of historical sites, cultural attractions, local cuisine, and hidden gems across Egypt. Your task is to create a detailed, balanced {num_days}-day itinerary for {visitor_type} visitors to {city}, Egypt.
+            template="""You are an expert Egyptian travel planner with extensive knowledge of historical sites, cultural attractions, local cuisine, and hidden gems across Egypt. Your task is to [...]
             
             ### AVAILABLE INFORMATION:
             {context}
@@ -599,7 +598,6 @@ class LLMService:
             3. BUDGET MANAGEMENT (HIGHEST PRIORITY):
             - The total cost MUST NOT EXCEED {budget} EGP under any circumstances
             - Use EXACT TICKET PRICES from the "TICKET PRICES AND VISITING HOURS" section when available
-            - Use realistic price estimates for restaurants based on the "RESTAURANTS AND CAFES" section
             - Reserve 10% of the budget for transportation between sites
             - If the budget is tight, prioritize must-see attractions over secondary experiences
 
@@ -612,9 +610,17 @@ class LLMService:
 
             5. DINING RECOMMENDATIONS:
             - Select restaurants and cafes specifically mentioned in the "RESTAURANTS AND CAFES" section
-            - Include estimated meal costs based on price information provided (or conservative estimates)
+            - IMPORTANT: DO NOT use price information from the data as it is outdated
+            - ALWAYS use the following CURRENT standard price estimates for meals regardless of any prices mentioned in the data:
+            * Breakfast: 150 EGP minimum per person
+            * Lunch: 250 EGP minimum per person  
+            * Dinner: 300 EGP minimum per person
+            - Adjust meal prices UPWARD based on restaurant ratings and quality:
+            * For each star of rating above 4.0, add 20% to the minimum price
+            * For restaurants described as "expensive", "high-end", or with terms indicating luxury, add 50% to the minimum price
+            * For restaurants with specialty cuisine, famous chefs, or unique experiences, add 30-40% to the minimum price
+            - The price level indicators (inexpensive, moderate, etc.) should be used ONLY to adjust the minimum prices upward, NOT to lower them
             - Vary dining experiences between traditional Egyptian cuisine and other options
-            - Consider price levels (moderate, inexpensive) noted in the restaurant data
 
             6. DAILY STRUCTURE:
             - Organize each day in chronological order (morning to evening)
@@ -632,11 +638,15 @@ class LLMService:
             DO NOT exceed the total budget provided - this is a strict requirement.
             DO NOT recommend places not listed in the provided context.
             DO NOT include places from cities other than {city}.
+            DO NOT use outdated price information from the data for restaurants and cafes.
             DO include a diverse mix of attractions and dining options.
+            DO ALWAYS use the minimum meal prices specified (breakfast: 150 EGP, lunch: 250 EGP, dinner: 300 EGP) and adjust upward based on quality.
 
             Your response must follow the structured format required by the JSON schema, with complete details for each day's activities and accurate cost tracking.
             """
         )
+        
+        
         
         prompt = budget_conscious_prompt.format(
             context=context_text,
