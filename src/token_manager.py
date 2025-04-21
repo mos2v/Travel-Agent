@@ -25,7 +25,7 @@ class TokenManager:
                     "name": "gemini-2.0-flash",
                     "provider": "google-genai",
                     "token_limit": 1000000,
-                    "daily_request_limit": 500,  
+                    "daily_request_limit": 1500,  
                     "temperature": 0.0, 
                     "priority": 1
                 },
@@ -33,7 +33,7 @@ class TokenManager:
                     "name": "gemini-2.5-flash-preview-04-17",
                     "provider": "google-genai",
                     "token_limit": 1000000,
-                    "daily_request_limit": 1500,  
+                    "daily_request_limit": 500,  
                     "temperature": 0.0,  
                     "priority": 2
                 },
@@ -54,44 +54,36 @@ class TokenManager:
                     "priority": 4,
                 },
                 "low_priority_1": {
-                    "name": "gemini-2.5-pro-preview-03-25",
-                    "provider": 'google-genai',
-                    "token_limit": 135000,
-                    "daily_request_limit": 25,  
-                    "temperature": 0,  
-                    "priority": 5
-                },
-                "low_priority_2": {
                     "name": 'gemini-2.5-pro-exp-03-25',
                     "provider": 'google-genai',
                     "token_limit": 135000,
                     "daily_request_limit": 25,  
                     "temperature": 0, 
-                    "priority": 6
+                    "priority": 5
                 },
-                "low_priority_3": {
+                "low_priority_2": {
                     "name":"gemini-2.0-flash-exp-image-generation", 
                     "provider":"google-genai",
                     "token_limit": 135000,
                     "daily_request_limit": 25, 
                     "temperature": 0,  
-                    "priority": 7
+                    "priority": 6
                 },
-                "low_priority_4": {
+                "low_priority_3": {
                     "name": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
                     "provider": "nvidia",
                     "token_limit": None,  
                     "daily_request_limit": None,  #
                     "temperature": 0,
-                    "priority": 8
+                    "priority": 7
                 },
-                # "low_priority_5": {
+                # "low_priority_4": {
                 #     "name": "llama-3.3-70b-versatile",
                 #     "provider": "groq",
                 #     "token_limit": 96000,
                 #     "daily_request_limit": None,
                 #     "temperature": 0.0,
-                #     "priority": 9
+                #     "priority": 8
                 # },
                 # "low_priority_6": {
                 #     "name": "llama-3.3-70b-specdec",
@@ -99,7 +91,7 @@ class TokenManager:
                 #     "token_limit": 96000,
                 #     "daily_request_limit": None,
                 #     "temperature": 0.0,
-                #     "priority": 7
+                #     "priority": 9
                 # },
                 # "fallback": {
                 #   "name": "meta/llama-3.3-70b-instruct",
@@ -107,7 +99,7 @@ class TokenManager:
                 #     "token_limit": None,
                 #     "daily_request_limit": None,
                 #     "temperature": 0.2,
-                #     "priority": 7,
+                #     "priority": 10,
                 # } 
             }
         else:

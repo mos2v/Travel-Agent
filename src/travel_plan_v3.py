@@ -692,8 +692,8 @@ if __name__ == '__main__':
     # llm_manager = LLMService("nvidia/llama-3.3-nemotron-super-49b-v1", provider="nvidia")
     # llm_manager = LLMService("mistral-large-latest", provider="mistralai")
     # llm_manager = LLMService("meta/llama-4-maverick-17b-128e-instruct", provider='nvidia')
-    llm_manager = LLMService("gemini-2.0-flash", provider="google-genai", temperature=0.4)
-    # llm_manager = LLMService("gemini-2.5-flash-preview-04-17", provider="google-genai", temperature=0.4)
+    # llm_manager = LLMService("gemini-2.0-flash", provider="google-genai", temperature=0.4)
+    llm_manager = LLMService("gemini-2.5-pro-exp-03-25", provider="google-genai", temperature=0)
     # llm_manager = LLMService("meta-llama/llama-4-maverick-17b-128e-instruct", provider='groq')
     
     travel_plan = llm_manager.travel_plan(retriever, args.city, args.favorite_places, args.visitor_type, args.num_days, args.budget)
