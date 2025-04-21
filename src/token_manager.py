@@ -56,7 +56,7 @@ class TokenManager:
                 "low_priority_1": {
                     "name": 'gemini-2.5-pro-exp-03-25',
                     "provider": 'google-genai',
-                    "token_limit": 135000,
+                    "token_limit": 500000,
                     "daily_request_limit": 25,  
                     "temperature": 0, 
                     "priority": 5
@@ -64,7 +64,7 @@ class TokenManager:
                 "low_priority_2": {
                     "name":"gemini-2.0-flash-exp-image-generation", 
                     "provider":"google-genai",
-                    "token_limit": 135000,
+                    "token_limit": 500000,
                     "daily_request_limit": 25, 
                     "temperature": 0,  
                     "priority": 6
