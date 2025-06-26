@@ -91,7 +91,6 @@ class TravelPlanRequest(BaseModel):
 class PackingListRequest(BaseModel):
     session_id: Optional[str] = Field(default=None, description="Session ID from travel plan generation")
     travel_plan: Optional[dict] = Field(default=None, description="Full travel plan object (fallback if session expired)")
-    user_input: str = Field(description="User's packing requirements or context")
     city: Optional[str] = Field(default=None, description="City for the trip (will be extracted from session if not provided)")
     start_date: Optional[str] = Field(default=None, description="Trip start date (YYYY-MM-DD)")
     end_date: Optional[str] = Field(default=None, description="Trip end date (YYYY-MM-DD)")
@@ -100,7 +99,6 @@ class PackingListRequest(BaseModel):
         json_schema_extra = {
             "example": {
                 "session_id": "travel_session_abc123",
-                "user_input": "I'm traveling to Luxor for 3 days in winter, what should I pack?",
                 "start_date": "2025-07-01",
                 "end_date": "2025-07-03"
             }
@@ -253,7 +251,6 @@ async def generate_packing_list(request: PackingListRequest):
         logger.info("🎒 Generating packing list...")
         packing_list_result = packing_llm.generate_packing_list(
             packing_list_retriever,
-            request.user_input,
             travel_plan_data,
             city=city,
             start_date=start_date,
@@ -268,7 +265,6 @@ async def generate_packing_list(request: PackingListRequest):
             "packing_list": packing_list_result.content if hasattr(packing_list_result, 'content') else str(packing_list_result),
             "session_id": request.session_id,
             "based_on_session": bool(request.session_id and session_data),
-            "user_input": request.user_input,
             "city": city,
             "start_date": start_date,
             "end_date": end_date

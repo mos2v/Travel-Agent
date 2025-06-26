@@ -6,7 +6,7 @@
     <title>Travel Planner with Packing List - Test Client</title>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: Arial, Tahoma, Geneva, Verdana, sans-serif;
             max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
@@ -189,10 +189,7 @@
         <div class="form-section" id="packingSection" style="display: none;">
             <h2>🎒 Generate Packing List</h2>
             <form id="packingForm">
-                <div class="form-group">
-                    <label for="user_input">Packing Requirements:</label>
-                    <textarea id="user_input" name="user_input" rows="3" placeholder="e.g., I'm traveling to Luxor for 3 days in summer, what should I pack?">I'm traveling for my planned trip, what should I pack?</textarea>
-                </div>
+                <p>The packing list will be automatically generated based on your travel plan, destination, and trip dates.</p>
                 <button type="submit" id="generatePackingList">Generate Packing List</button>
             </form>
         </div>
@@ -265,21 +262,6 @@
                 // Show packing list section
                 packingSection.style.display = 'block';
                 
-                // Pre-fill packing list input
-                const userInput = document.getElementById('user_input');
-                const startDate = new Date(data.start_date);
-                const endDate = new Date(data.end_date);
-                const duration = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
-                const month = startDate.getMonth() + 1;
-                
-                let season = 'spring';
-                if (month >= 12 || month <= 2) season = 'winter';
-                else if (month >= 3 && month <= 5) season = 'spring';
-                else if (month >= 6 && month <= 8) season = 'summer';
-                else season = 'autumn';
-                
-                userInput.value = `I'm traveling to ${data.city} for ${duration} days in ${season} (${data.start_date} to ${data.end_date}), what should I pack?`;
-                
             } catch (error) {
                 resultsDiv.innerHTML = `
                     <div class="results error">
@@ -349,7 +331,8 @@
                         <h3>🎒 Your Packing List</h3>
                         <div class="session-info">
                             <p><strong>Based on session:</strong> ${result.based_on_session ? 'Yes' : 'No'}</p>
-                            <p><strong>User input:</strong> ${result.user_input}</p>
+                            <p><strong>City:</strong> ${result.city}</p>
+                            <p><strong>Dates:</strong> ${result.start_date} to ${result.end_date}</p>
                         </div>
                         <pre>${result.packing_list}</pre>
                     </div>

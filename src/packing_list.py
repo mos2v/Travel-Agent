@@ -82,12 +82,12 @@ class LLMPackingList:
         query = llm.invoke(prompt_text)
         return query.content
 
-    def generate_packing_list(self, retriever, user_input: str, travel_plan, city: str = None, start_date: str = None, end_date: str = None):
+    def generate_packing_list(self, retriever, travel_plan, city: str = None, start_date: str = None, end_date: str = None):
         """
         Generate a comprehensive packing list based on travel plan and trip details.
         """
         llm = self.initialize_llm()
-        
+        user_input = f"I'm traveling to {city} for {len(travel_plan['days'])} days. What should I pack?"
         # Generate enhanced query with all available information
         query = self.generate_query_based_on_user_input(user_input, travel_plan, city, start_date, end_date)
         print(f"Generated Query: {query}")
@@ -224,12 +224,11 @@ if __name__ == "__main__":
     llm_packing_list = LLMPackingList(model_name="gemini-2.0-flash", provider='google-genai')
     
     # Test with enhanced parameters
-    user_input = "I'm traveling to Luxor for 3 days in summer, what should I pack?"
     start_date = "2025-07-15"
     end_date = "2025-07-17"
     
     packing_list_result = llm_packing_list.generate_packing_list(
-        retriever, user_input, travel_plan, city=city, start_date=start_date, end_date=end_date
+        retriever, travel_plan, city=city, start_date=start_date, end_date=end_date
     )
     
     # Print the packing list result in a more readable format
