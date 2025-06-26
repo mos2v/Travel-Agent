@@ -26,7 +26,6 @@ os.environ["LANGCHAIN_PROJECT"] = "Rag_travel_planner_v3.0.0"
 
 
 
-# Define color scheme for different operation types
 PROGRESS_COLORS = {
     'data_loading': '#00FF00',    # Blue for data loading
     'processing': '#13D4D4',      # Green for data processing
@@ -284,14 +283,13 @@ class LLMService:
                 raise ValueError('Unsupported model provider')
             
             
-    def _generate_enhanced_query(self, destination, interests, visitor_type):
+    def _generate_enhanced_query(self, destination, interests):
         """
         Generate multiple focused queries to ensure balanced retrieval of different place types.
         
         Args:
             destination (str): The main destination city for the trip
             interests (list): List of specific interests like ["temples", "museums", "local cuisine"]
-            visitor_type (str): Type of visitor (Egyptian, Foreign, etc.)
         Returns:
             dict: Dictionary with different specialized queries
         """
@@ -348,7 +346,7 @@ class LLMService:
         city_lower = city.lower().strip()
         
         # Generate specialized queries for different types of places
-        query_dict = self._generate_enhanced_query(city, favorite_places, visitor_type)
+        query_dict = self._generate_enhanced_query(city, favorite_places)
         
         print("🔍 Retrieving relevant documents...")
         all_docs = []
@@ -676,10 +674,17 @@ if __name__ == '__main__':
     parser.add_argument('--city', type=str, required=True, help="User's travel City")
     parser.add_argument('--favorite_places', type=str, required=True, help="User's favorite types of places")
     parser.add_argument('--visitor_type', type=str, required=True, help="Visitor type (e.g., Foreign, Egyptian)")
-    parser.add_argument('--num_days', type=str, required=True, help="Number of travel days")
+    parser.add_argument('--start_date', type=str, required=True, help="Trip start date (YYYY-MM-DD)")
+    parser.add_argument('--end_date', type=str, required=True, help="Trip end date (YYYY-MM-DD)")
     parser.add_argument('--budget', type=str, required=True, help="Overall budget in EGP")
 
     args = parser.parse_args()
+    
+    # Calculate number of days from dates for backward compatibility
+    from datetime import datetime
+    start_date_obj = datetime.strptime(args.start_date, "%Y-%m-%d")
+    end_date_obj = datetime.strptime(args.end_date, "%Y-%m-%d")
+    num_days = (end_date_obj - start_date_obj).days + 1
     
     data = DataLoader()
     document_processor = DocumentProcessor(data.landmark_prices, data.places_api_data)
@@ -693,10 +698,11 @@ if __name__ == '__main__':
     # llm_manager = LLMService("mistral-large-latest", provider="mistralai")
     # llm_manager = LLMService("meta/llama-4-maverick-17b-128e-instruct", provider='nvidia')
     # llm_manager = LLMService("gemini-2.0-flash", provider="google-genai", temperature=0.4)
-    llm_manager = LLMService("gemini-2.5-pro-exp-03-25", provider="google-genai", temperature=0)
+    llm_manager = LLMService("gemini-2.5-pro", provider="google-genai", temperature=0)
+    llm_manager = LLMService("gemini-2.0-flash", provider="google-genai", temperature=0)
     # llm_manager = LLMService("meta-llama/llama-4-maverick-17b-128e-instruct", provider='groq')
     
-    travel_plan = llm_manager.travel_plan(retriever, args.city, args.favorite_places, args.visitor_type, args.num_days, args.budget)
+    travel_plan = llm_manager.travel_plan(retriever, args.city, args.favorite_places, args.visitor_type, str(num_days), args.budget)
     
     print("\n📋 Generated Travel Plan:")
     print(json.dumps(travel_plan, indent=4))

@@ -18,3 +18,6 @@ data/places_details_raw2.csv
 place_details_checkpoint_merged.pkl
 place_ids_checkpoint_merged.pkl
 scratch.ipynb
+idk.csv
+travel_plan_sessions.pkl
+test_session_api.py
