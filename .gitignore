@@ -20,9 +20,5 @@ place_ids_checkpoint_merged.pkl
 scratch.ipynb
 idk.csv
 travel_plan_sessions.pkl
-test_session_api.py
 packing_list
-test_categorization.py
-test_complete_system.py
-test_enhanced_queries.py
-test_query_simulation.py
+tests/

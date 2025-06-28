@@ -262,7 +262,7 @@ async def generate_packing_list(request: PackingListRequest):
             session_manager.extend_session(request.session_id, hours=1)
         
         return {
-            "packing_list": packing_list_result.content if hasattr(packing_list_result, 'content') else str(packing_list_result),
+            "packing_list": packing_list_result,
             "session_id": request.session_id,
             "based_on_session": bool(request.session_id and session_data),
             "city": city,
