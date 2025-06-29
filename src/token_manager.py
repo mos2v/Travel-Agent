@@ -21,13 +21,27 @@ class TokenManager:
         # Define default model configurations if not provided
         if models_config is None:
             self.models_config = {
-                "high_priority": {
+                "high_priority_1": {
                     "name": "gemini-2.0-flash",
                     "provider": "google-genai",
-                    "token_limit": 1000000,
+                    "token_limit": 10000000,
                     "daily_request_limit": 1500,  
                     "temperature": 0.0, 
                     "priority": 1
+                },
+                "high_priority_2": {
+                    "name": "meta-llama/llama-4-scout-17b-16e-instruct",
+                    "provider": "groq",
+                    "token_limit": 500000,
+                    "temperature": 0.0,  
+                    "priority": 2
+                },
+                "high_priority_3": {
+                    "name": "gemini-2.5-flash",
+                    "provider": "google-genai",
+                    "token_limit": 2000000,
+                    "temperature": 0.2,  
+                    "priority": 3
                 },
                 "medium_priority_1": {
                     "name": "gemini-2.5-flash-preview-04-17",
@@ -38,10 +52,10 @@ class TokenManager:
                     "priority": 2
                 },
                 "medium_priority_2": {
-                    "name": "gemini-2.0-flash-lite",
+                    "name": "gemini-2.5-flash-lite-preview-06-17",
                     "provider": "google-genai",
                     "token_limit": 4000000,
-                    "daily_request_limit": 1500, 
+                    "daily_request_limit": 500, 
                     "temperature": 0.1,
                     "priority": 3  
                 },
@@ -54,24 +68,24 @@ class TokenManager:
                     "priority": 4,
                 },
                 "low_priority_1": {
-                    "name": 'gemini-2.5-pro-exp-03-25',
+                    "name": "gemini-2.0-flash-lite",
                     "provider": 'google-genai',
-                    "token_limit": 500000,
-                    "daily_request_limit": 25,  
-                    "temperature": 0, 
+                    "token_limit": 5000000,
+                    "daily_request_limit": 1500,  
+                    "temperature": .3, 
                     "priority": 5
                 },
                 "low_priority_2": {
-                    "name":"gemini-2.0-flash-exp-image-generation", 
+                    "name":"gemini-2.5-pro", 
                     "provider":"google-genai",
                     "token_limit": 500000,
                     "daily_request_limit": 25, 
-                    "temperature": 0,  
+                    "temperature": 0.1,  
                     "priority": 6
                 },
                 "low_priority_3": {
-                    "name": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-                    "provider": "nvidia",
+                    "name": "magistral-medium-2506",
+                    "provider": "mistralai",
                     "token_limit": None,  
                     "daily_request_limit": None,  #
                     "temperature": 0,
@@ -451,3 +465,37 @@ class TokenManager:
             },
             "models": model_stats
         }
+    
+    def set_current_model(self, model_name: str, provider: str) -> bool:
+        """
+        Manually set the current model and provider.
+        Returns True if successful, False if model not found or invalid.
+        """
+        # First, check if this exact model and provider combination exists
+        for model_id, config in self.models_config.items():
+            if config["name"] == model_name and config["provider"] == provider:
+                self.usage_data["current_model_id"] = model_id
+                self._save_usage_data()
+                logger.info(f"Current model manually set to {model_name} (provider: {provider})")
+                return True
+        
+        # If not found, try to add it as a new model configuration
+        # Generate a new model ID
+        new_model_id = f"custom_{len(self.models_config)}"
+        
+        # Add new model with default settings
+        self.models_config[new_model_id] = {
+            "name": model_name,
+            "provider": provider,
+            "token_limit": 1000000,  # Default limit
+            "daily_request_limit": 1000,  # Default limit
+            "temperature": 0.0,  # Default temperature
+            "priority": 999  # Low priority for custom models
+        }
+        
+        # Set as current model
+        self.usage_data["current_model_id"] = new_model_id
+        self._save_usage_data()
+        
+        logger.info(f"Added new model {model_name} (provider: {provider}) and set as current")
+        return True

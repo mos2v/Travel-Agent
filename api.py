@@ -330,22 +330,63 @@ async def get_usage_stats():
     
     return token_manager.get_usage_stats()
 
-@app.post("/api/set-temperature")
-async def set_model_temperature(model_name: str = Query(..., description="Model name to update temperature for"), 
-                               temperature: float = Query(..., description="Temperature value (0.0-1.0)")):
-    """Endpoint to set the temperature for a specific model."""
-    global token_manager
+@app.post("/api/set-model")
+async def set_model_configuration(
+    model_name: str = Query(..., description="Model name to use"), 
+    provider: str = Query(..., description="Provider (groq, nvidia, mistralai, google-genai)"),
+    temperature: float = Query(default=None, description="Temperature value (0.0-1.0), optional")
+):
+    """Endpoint to set the model, provider, and optionally temperature."""
+    global token_manager, llm_manager
     if token_manager is None:
         return {"error": "Token manager not initialized"}
     
-    # Ensure temperature is within valid range
-    temperature = max(0.0, min(1.0, temperature))
+    # Validate provider
+    valid_providers = ['groq', 'nvidia', 'mistralai', 'google-genai']
+    if provider not in valid_providers:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid provider. Must be one of: {', '.join(valid_providers)}"
+        )
     
-    success = token_manager.set_model_temperature(model_name, temperature)
-    if success:
-        return {"status": "success", "message": f"Temperature for model {model_name} set to {temperature}"}
-    else:
-        raise HTTPException(status_code=404, detail=f"Model {model_name} not found")
+    # Set the model and provider in token manager
+    success = token_manager.set_current_model(model_name, provider)
+    if not success:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Failed to set model {model_name} with provider {provider}"
+        )
+    
+    # Set temperature if provided
+    if temperature is not None:
+        # Ensure temperature is within valid range
+        temperature = max(0.0, min(1.0, temperature))
+        temp_success = token_manager.set_model_temperature(model_name, temperature)
+        if not temp_success:
+            # Model was set but temperature failed - still return success for model change
+            logger.warning(f"Model set successfully but failed to set temperature for {model_name}")
+    
+    # Update the LLM manager with new configuration
+    try:
+        current_temperature = token_manager.get_model_temperature()
+        llm_manager = LLMService(model_name, provider=provider, temperature=current_temperature)
+        logger.info(f"🔄 Updated LLM manager: {model_name} (provider: {provider}, temperature: {current_temperature})")
+    except Exception as e:
+        logger.error(f"Failed to update LLM manager: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Model and provider set but failed to initialize LLM: {str(e)}"
+        )
+    
+    response_data = {
+        "status": "success", 
+        "model_name": model_name,
+        "provider": provider,
+        "temperature": token_manager.get_model_temperature(),
+        "message": f"Model set to {model_name} with provider {provider}"
+    }
+    
+    return response_data
 
 
 @app.get("/api/session-stats")
@@ -359,6 +400,60 @@ async def get_session_stats():
         "active_sessions": session_manager.get_active_sessions_count(),
         "expiration_hours": session_manager.expiration_hours,
         "persist_to_file": session_manager.persist_to_file
+    }
+
+@app.get("/api/model-config")
+async def get_model_configuration():
+    """Endpoint to get the current model configuration."""
+    global token_manager
+    if token_manager is None:
+        return {"error": "Token manager not initialized"}
+    
+    try:
+        model_name, provider = token_manager.get_current_model()
+        temperature = token_manager.get_model_temperature()
+        
+        return {
+            "status": "success",
+            "model_name": model_name,
+            "provider": provider,
+            "temperature": temperature,
+            "available_providers": ['groq', 'nvidia', 'mistralai', 'google-genai']
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting model configuration: {str(e)}")
+
+@app.get("/api/available-models")
+async def get_available_models():
+    """Endpoint to get available models for each provider."""
+    # This is a static list - in a real implementation, you might want to fetch these dynamically
+    available_models = {
+        "groq": [
+            "meta-llama/llama-4-maverick-17b-128e-instruct",
+            "meta-llama/llama-4-scout-17b-16e-instruct"
+        ],
+        "nvidia": [
+            "meta/llama-3.3-70b-instruct",
+        ],
+        "mistralai": [
+            "mistral-large-latest",
+            "magistral-medium-2506",
+        ],
+        "google-genai": [
+            "gemini-2.5-pro",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-preview-04-17",
+            "gemini-2.5-flash-lite-preview-06-17",
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-lite",
+        ]
+    }
+    
+    return {
+        "status": "success",
+        "available_models": available_models,
+        "total_providers": len(available_models),
+        "total_models": sum(len(models) for models in available_models.values())
     }
 
 if __name__ == "__main__":
