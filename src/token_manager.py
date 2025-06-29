@@ -1,7 +1,7 @@
 import json
 import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Any
 from langchain_core.callbacks import UsageMetadataCallbackHandler
 import logging
 
@@ -10,36 +10,34 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger("TokenManager")
 
 class TokenManager:
-    def __init__(
-        self,
-        models_config: Optional[Dict] = None, # Configuration for models
-        storage_path: str = "token_usage.json" # Path to store token usage data
-    ):
+    def __init__(self, models_config: Optional[Dict] = None, storage_path: str = "token_usage.json"):
         self.storage_path = Path(storage_path)
         self.callback_handler = UsageMetadataCallbackHandler()
         
-        # Define default model configurations if not provided
+        # Default model configurations
         if models_config is None:
             self.models_config = {
                 "high_priority_1": {
                     "name": "gemini-2.0-flash",
                     "provider": "google-genai",
                     "token_limit": 10000000,
-                    "daily_request_limit": 1500,  
-                    "temperature": 0.0, 
+                    "daily_request_limit": 1500,
+                    "temperature": 0.0,
                     "priority": 1
                 },
                 "high_priority_2": {
                     "name": "meta-llama/llama-4-scout-17b-16e-instruct",
                     "provider": "groq",
                     "token_limit": 500000,
-                    "temperature": 0.0,  
+                    "daily_request_limit": 1000,
+                    "temperature": 0.0,
                     "priority": 2
                 },
                 "high_priority_3": {
                     "name": "gemini-2.5-flash",
                     "provider": "google-genai",
                     "token_limit": 2000000,
+                    "daily_request_limit": 500,
                     "temperature": 0.2,  
                     "priority": 3
                 },
@@ -49,7 +47,7 @@ class TokenManager:
                     "token_limit": 1000000,
                     "daily_request_limit": 500,  
                     "temperature": 0.0,  
-                    "priority": 2
+                    "priority": 4
                 },
                 "medium_priority_2": {
                     "name": "gemini-2.5-flash-lite-preview-06-17",
@@ -57,7 +55,7 @@ class TokenManager:
                     "token_limit": 4000000,
                     "daily_request_limit": 500, 
                     "temperature": 0.1,
-                    "priority": 3  
+                    "priority": 5  
                 },
                 "medium_priority_3": {
                     "name": "mistral-large-latest",
@@ -65,7 +63,7 @@ class TokenManager:
                     "token_limit": 2000000,
                     "daily_request_limit": None, 
                     "temperature": 0.2,  
-                    "priority": 4,
+                    "priority": 6
                 },
                 "low_priority_1": {
                     "name": "gemini-2.0-flash-lite",
@@ -73,7 +71,7 @@ class TokenManager:
                     "token_limit": 5000000,
                     "daily_request_limit": 1500,  
                     "temperature": .3, 
-                    "priority": 5
+                    "priority": 7
                 },
                 "low_priority_2": {
                     "name":"gemini-2.5-pro", 
@@ -81,7 +79,7 @@ class TokenManager:
                     "token_limit": 500000,
                     "daily_request_limit": 25, 
                     "temperature": 0.1,  
-                    "priority": 6
+                    "priority": 8
                 },
                 "low_priority_3": {
                     "name": "magistral-medium-2506",
@@ -89,7 +87,7 @@ class TokenManager:
                     "token_limit": None,  
                     "daily_request_limit": None,  #
                     "temperature": 0,
-                    "priority": 7
+                    "priority": 9
                 },
                 # "low_priority_4": {
                 #     "name": "llama-3.3-70b-versatile",
@@ -118,50 +116,42 @@ class TokenManager:
             }
         else:
             self.models_config = models_config
-            
-        # Initialize token usage tracking
+        
+        self._normalize_model_configs()
         self.usage_data = self._load_usage_data()
+        self._validate_and_fix_usage_data()
         
     def _get_today_date(self) -> str:
-        """Get today's date as a string in YYYY-MM-DD format."""
         return datetime.datetime.now().strftime("%Y-%m-%d")
-    
         
     def _get_highest_priority_model_id(self) -> str:
-        """Get the model ID with the highest priority (lowest priority number)."""
         return min(self.models_config.items(), key=lambda x: x[1]["priority"])[0]
         
     def _load_usage_data(self) -> Dict:
-        """Load token usage data from storage."""
         if not self.storage_path.exists():
-            
             return {
                 "last_updated": self._get_today_date(),
                 "current_model_id": self._get_highest_priority_model_id(),
                 "model_usage": {},
-                "request_counts": {}  # Track request counts separately
+                "request_counts": {}
             }
             
         try:
             with open(self.storage_path, "r") as f:
                 data = json.load(f)
                 
-            # Ensure request_counts exists
             if "request_counts" not in data:
                 data["request_counts"] = {}
                 
-            # Check if we need to reset for a new day
             today = self._get_today_date()
             if data.get("last_updated") != today:
                 data['last_updated'] = today
-                # Reset current model to highest priority model for a new day
                 data['current_model_id'] = self._get_highest_priority_model_id()
-                # Reset request counts for a new day
                 data['request_counts'] = {}
                 
             return data
         except Exception as e:
-            logger.error(f"Error loading token usage data: {e}. Using default values.")
+            logger.error(f"Error loading token usage data: {e}. Using defaults.")
             return {
                 "last_updated": self._get_today_date(),
                 "current_model_id": self._get_highest_priority_model_id(),
@@ -265,6 +255,17 @@ class TokenManager:
         """
         today = self._get_today_date()
         current_model_id = self.usage_data["current_model_id"]
+        
+        # Add debugging
+        logger.debug(f"🔍 Checking model switch for {current_model_id}")
+        
+        if current_model_id not in self.models_config:
+            logger.error(f"❌ Current model ID {current_model_id} not found in models_config!")
+            # Reset to highest priority model
+            self.usage_data["current_model_id"] = self._get_highest_priority_model_id()
+            self._save_usage_data()
+            return
+        
         current_model = self.models_config[current_model_id]
         current_model_name = current_model["name"]
         
@@ -284,11 +285,11 @@ class TokenManager:
             current_request_count = self.usage_data["request_counts"][current_model_name][today]
         
         # Check if current model exceeded its token limit or request limit
-        token_limit_exceeded = (current_model["token_limit"] is not None and 
-                               current_usage >= current_model["token_limit"])
+        token_limit_exceeded = (current_model.get("token_limit") is not None and 
+                               current_usage >= current_model.get("token_limit", float('inf')))
         
-        request_limit_exceeded = (current_model["daily_request_limit"] is not None and 
-                                 current_request_count >= current_model["daily_request_limit"])
+        request_limit_exceeded = (current_model.get("daily_request_limit") is not None and 
+                                 current_request_count >= current_model.get("daily_request_limit", float('inf')))
         
         if token_limit_exceeded or request_limit_exceeded:
             # Find the next eligible model
@@ -334,7 +335,7 @@ class TokenManager:
                 return model_id
             
             # Check if model has unlimited tokens and requests
-            if config["token_limit"] is None and config["daily_request_limit"] is None:
+            if config.get("token_limit") is None and config.get("daily_request_limit") is None:
                 return model_id
             
             # Check token usage
@@ -349,8 +350,8 @@ class TokenManager:
                 request_count = self.usage_data["request_counts"][model_name][today]
             
             # Check if model is under both token and request limits
-            token_limit_ok = config["token_limit"] is None or token_usage < config["token_limit"]
-            request_limit_ok = config["daily_request_limit"] is None or request_count < config["daily_request_limit"]
+            token_limit_ok = config.get("token_limit") is None or token_usage < config.get("token_limit", float('inf'))
+            request_limit_ok = config.get("daily_request_limit") is None or request_count < config.get("daily_request_limit", float('inf'))
             
             if token_limit_ok and request_limit_ok:
                 return model_id
@@ -364,6 +365,14 @@ class TokenManager:
         Returns a tuple of (model_name, provider)
         """
         model_id = self.usage_data["current_model_id"]
+        
+        # Safety check: ensure model_id exists in models_config
+        if model_id not in self.models_config:
+            logger.warning(f"Current model ID {model_id} not found in config. Resetting to default.")
+            model_id = self._get_highest_priority_model_id()
+            self.usage_data["current_model_id"] = model_id
+            self._save_usage_data()
+        
         model_config = self.models_config[model_id]
         return model_config["name"], model_config["provider"]
     
@@ -499,3 +508,37 @@ class TokenManager:
         
         logger.info(f"Added new model {model_name} (provider: {provider}) and set as current")
         return True
+    
+    def _normalize_model_configs(self) -> None:
+        """Ensure all model configurations have required fields with default values."""
+        required_fields = {
+            "name": "",
+            "provider": "",
+            "token_limit": 1000000,
+            "daily_request_limit": 1000,
+            "temperature": 0.0,
+            "priority": 999
+        }
+        
+        for model_id, config in self.models_config.items():
+            for field, default_value in required_fields.items():
+                if field not in config:
+                    config[field] = default_value
+                    logger.warning(f"Added missing field '{field}' to model {model_id} with default value {default_value}")
+    
+    def _validate_and_fix_usage_data(self) -> None:
+        """Validate and fix inconsistencies in usage data."""
+        # Ensure current_model_id exists in models_config
+        current_model_id = self.usage_data.get("current_model_id")
+        if not current_model_id or current_model_id not in self.models_config:
+            logger.warning(f"Invalid current_model_id: {current_model_id}. Resetting to highest priority model.")
+            self.usage_data["current_model_id"] = self._get_highest_priority_model_id()
+            self._save_usage_data()
+        
+        # Ensure request_counts exists
+        if "request_counts" not in self.usage_data:
+            self.usage_data["request_counts"] = {}
+            
+        # Ensure model_usage exists
+        if "model_usage" not in self.usage_data:
+            self.usage_data["model_usage"] = {}

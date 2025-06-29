@@ -8,6 +8,8 @@ import pandas as pd
 from pathlib import Path
 from langchain_core.documents import Document
 from langchain.prompts import PromptTemplate
+from langchain.callbacks.base import BaseCallbackHandler
+
 
 # Handle imports for both API usage and direct script execution
 try:
@@ -21,7 +23,7 @@ except ImportError:
         parent_dir = Path(__file__).parent.parent
         sys.path.insert(0, str(parent_dir))
         from src.travel_plan_v3 import VectorStoreManager, LLMService
-class processPackingList:
+class PackingListProcessor:
     def __init__(self, path: str):
         self.df = pd.read_csv(Path(__file__).parent.resolve() / "../data" / path)
         
@@ -37,7 +39,7 @@ class processPackingList:
         return documents
     
 
-class LLMPackingList:
+class PackingListGenerator:
     def __init__(self, model_name, provider='google-genai', temperature: float = 0.3):
         self.provider = provider
         self.model_name = model_name
@@ -199,7 +201,7 @@ Examples: "summer Egypt sun protection"; "Luxor temple modest clothing"; "Egypt 
 Output 4-6 queries separated by semicolons:"""
         )
         prompt_text = prompt.format(context=context)
-        query = llm.invoke(prompt_text)
+        query = llm.invoke(prompt_text, config={"callbacks":[BaseCallbackHandler]})
         return query.content
 
     def generate_packing_list(self, retriever, travel_plan, city: str = None, start_date: str = None, end_date: str = None):
@@ -296,7 +298,7 @@ Base recommendations on provided items database. Be comprehensive yet practical.
             trip_context=trip_context
         )
         
-        packing_list = llm.invoke(prompt_text)
+        packing_list = llm.invoke(prompt_text, config={"callbacks":[BaseCallbackHandler]})
         return packing_list
         
     
@@ -329,13 +331,13 @@ if __name__ == "__main__":
     print(json.dumps(travel_plan, indent=4))
     
     # Initialize packing list components
-    packing_list_processor = processPackingList("egy_guide_packing_list_final_100.csv")
+    packing_list_processor = PackingListProcessor("egy_guide_packing_list_final_100.csv")
     documents = packing_list_processor.df_to_documents()
     
     vector_store_manager1 = VectorStoreManager(documents=documents, path="packing_list")
     retriever = vector_store_manager1.get_retriever()
     
-    llm_packing_list = LLMPackingList(model_name="gemini-2.0-flash", provider='google-genai')
+    llm_packing_list = PackingListGenerator(model_name="gemini-2.0-flash", provider='google-genai')
     
     # Test with enhanced parameters
     start_date = "2025-07-15"

@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 from src.travel_plan_v3 import DataLoader, DocumentProcessor, VectorStoreManager, LLMService
 from src.token_manager import TokenManager
 from src.session_manager import SessionManager, create_travel_session
-from src.packing_list import LLMPackingList, processPackingList
+from src.packing_list import PackingListGenerator, PackingListProcessor
+from datetime import datetime
 import traceback
 import logging
 from typing import Optional
@@ -41,7 +42,7 @@ async def lifespan(app: FastAPI):
     retriever = vector_store.get_retriever()
 
     logger.info("🎒 Loading packing list data...")
-    packing_list_processor = processPackingList("Extended_Egypt_Packing_List_with_New_Items.csv")
+    packing_list_processor = PackingListProcessor("Extended_Egypt_Packing_List_with_New_Items.csv")
     packing_documents = packing_list_processor.df_to_documents()
     packing_vector_store = VectorStoreManager(documents=packing_documents, path="packing_list")
     packing_list_retriever = packing_vector_store.get_retriever()
@@ -106,89 +107,66 @@ class PackingListRequest(BaseModel):
 
 @app.post("/api/travel-plan")
 async def generate_travel_plan(request: TravelPlanRequest):
-    
+    """Generate a travel plan based on user requirements."""
     global llm_manager, token_manager, session_manager
     
     try:
-        # Calculate number of days from start and end dates
-        from datetime import datetime
-        try:
-            start_date_obj = datetime.strptime(request.start_date, "%Y-%m-%d")
-            end_date_obj = datetime.strptime(request.end_date, "%Y-%m-%d")
-            num_days = (end_date_obj - start_date_obj).days + 1  # +1 to include both start and end days
-            
-            if num_days <= 0:
-                raise HTTPException(status_code=400, detail="End date must be after start date")
-                
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"Invalid date format. Use YYYY-MM-DD format. Error: {str(e)}")
+        # Calculate number of days
+        start_date_obj = datetime.strptime(request.start_date, "%Y-%m-%d")
+        end_date_obj = datetime.strptime(request.end_date, "%Y-%m-%d")
+        num_days = (end_date_obj - start_date_obj).days + 1
         
-        # Check if we need to switch models before processing
+        if num_days <= 0:
+            raise HTTPException(status_code=400, detail="End date must be after start date")
+        
+        # Get current model configuration
         current_model_name, current_provider = token_manager.get_current_model()
-        
-        # Get the default temperature for the current model
         default_temperature = token_manager.get_model_temperature()
-        
-        # Use request temperature if provided, otherwise use default
         temperature = request.temperature if request.temperature is not None else default_temperature
         
-        # If the current model doesn't match the LLM manager's model or temperature changed, update it
+        # Update LLM manager if needed
         if (llm_manager.model_name != current_model_name or 
             llm_manager.provider != current_provider or
             llm_manager.temperature != temperature):
             logger.info(f"🔄 Switching model to {current_model_name} (provider: {current_provider}, temperature: {temperature})")
             llm_manager = LLMService(current_model_name, provider=current_provider, temperature=temperature)
         
-        # Get the callback handler for token tracking
+        # Generate travel plan
         callback_handler = token_manager.get_callback_handler()
-        
-        # Generate travel plan using calculated num_days
         travel_plan = llm_manager.travel_plan(
-            retriever,
-            request.city,
-            request.favorite_places,
-            request.visitor_type,
-            str(num_days),  # Convert to string as expected by travel_plan
-            request.budget,
-            callbacks=[callback_handler]
+            retriever, request.city, request.favorite_places, request.visitor_type,
+            str(num_days), request.budget, callbacks=[callback_handler]
         )
         
-        # Update token usage after generation
+        # Update token usage
         usage_stats = token_manager.update_usage_from_callback()
         logger.info(f"Request completed. Tokens used: {usage_stats['total_tokens']}")
         
-        # Create session with travel plan and user parameters (including dates)
+        # Create session
         user_params = {
-            "city": request.city,
-            "favorite_places": request.favorite_places,
-            "visitor_type": request.visitor_type,
-            "start_date": request.start_date,
-            "end_date": request.end_date,
-            "num_days": num_days,  # Store calculated num_days
-            "budget": request.budget
+            "city": request.city, "favorite_places": request.favorite_places,
+            "visitor_type": request.visitor_type, "start_date": request.start_date,
+            "end_date": request.end_date, "num_days": num_days, "budget": request.budget
         }
         
-        # Create session and return travel plan with session info
         session_response = create_travel_session(travel_plan, user_params, session_manager)
-        
-        # Add calculated num_days to the response for reference
         session_response["calculated_days"] = num_days
         
         return session_response
         
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date format. Use YYYY-MM-DD format. Error: {str(e)}")
     except HTTPException:
         raise
     except Exception as e:
-        traceback.print_exc()  
+        logger.error(f"Error generating travel plan: {e}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error generating travel plan: {str(e)}")
 
 
 @app.post("/api/packing-list")
 async def generate_packing_list(request: PackingListRequest):
-    """
-    Generate a packing list based on a travel plan.
-    Can use session_id from previous travel plan generation or accept travel plan directly.
-    """
+    """Generate a packing list based on a travel plan."""
     global session_manager, packing_list_retriever, token_manager
     
     try:
@@ -205,14 +183,11 @@ async def generate_packing_list(request: PackingListRequest):
                 travel_plan_data = session_data["travel_plan"]
                 user_params = session_data["user_params"]
                 
-                # Extract city and dates from session if not provided in request
-                if not city:
-                    city = user_params.get("city")
-                if not start_date:
-                    start_date = user_params.get("start_date")
-                if not end_date:
-                    end_date = user_params.get("end_date")
-                    
+                # Extract missing info from session
+                city = city or user_params.get("city")
+                start_date = start_date or user_params.get("start_date")
+                end_date = end_date or user_params.get("end_date")
+                
                 logger.info(f"✅ Using travel plan from session {request.session_id}")
             else:
                 logger.warning(f"⚠️ Session {request.session_id} not found or expired")
@@ -222,42 +197,40 @@ async def generate_packing_list(request: PackingListRequest):
             travel_plan_data = request.travel_plan
             logger.info("✅ Using travel plan provided in request")
         
-        # If we still don't have a travel plan, return error
+        # Validate requirements
         if not travel_plan_data:
-            raise HTTPException(
-                status_code=400, 
-                detail="No travel plan available. Provide either a valid session_id or include travel_plan in the request."
-            )
+            raise HTTPException(status_code=400, 
+                detail="No travel plan available. Provide either a valid session_id or include travel_plan in the request.")
         
-        # Validate that we have necessary information
         if not city:
-            raise HTTPException(
-                status_code=400,
-                detail="City information is required. Provide city in request or use a valid session_id."
-            )
+            raise HTTPException(status_code=400,
+                detail="City information is required. Provide city in request or use a valid session_id.")
         
-        # Get current model settings
+        # Get current model settings and generate packing list
         current_model_name, current_provider = token_manager.get_current_model()
         default_temperature = token_manager.get_model_temperature()
         
-        # Initialize packing list LLM
-        packing_llm = LLMPackingList(
+        packing_llm = PackingListGenerator(
             model_name=current_model_name, 
             provider=current_provider, 
             temperature=default_temperature
         )
         
-        # Generate packing list with enhanced context
         logger.info("🎒 Generating packing list...")
+        logger.info(f"🔧 Using model: {current_model_name} (provider: {current_provider}, temp: {default_temperature})")
+        
+        # Generate packing list with token tracking
+        callback_handler = token_manager.get_callback_handler()
         packing_list_result = packing_llm.generate_packing_list(
-            packing_list_retriever,
-            travel_plan_data,
-            city=city,
-            start_date=start_date,
-            end_date=end_date
+            packing_list_retriever, travel_plan_data,
+            city=city, start_date=start_date, end_date=end_date
         )
         
-        # If we used a session, extend its expiration as a courtesy
+        # Update token usage
+        usage_stats = token_manager.update_usage_from_callback()
+        logger.info(f"Packing list generation completed. Tokens used: {usage_stats['total_tokens']}")
+        
+        # Extend session if used
         if request.session_id and session_data:
             session_manager.extend_session(request.session_id, hours=1)
         
@@ -273,6 +246,7 @@ async def generate_packing_list(request: PackingListRequest):
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"❌ Error in packing list generation: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error generating packing list: {str(e)}")
 
@@ -425,15 +399,14 @@ async def get_model_configuration():
 
 @app.get("/api/available-models")
 async def get_available_models():
-    """Endpoint to get available models for each provider."""
-    # This is a static list - in a real implementation, you might want to fetch these dynamically
+    """Get available models for each provider."""
     available_models = {
-        "groq": [
-            "meta-llama/llama-4-maverick-17b-128e-instruct",
-            "meta-llama/llama-4-scout-17b-16e-instruct"
-        ],
+        # "groq": [
+        #     "meta-llama/llama-4-maverick-17b-128e-instruct",
+        #     "meta-llama/llama-4-scout-17b-16e-instruct"
+        # ],
         "nvidia": [
-            "meta/llama-3.3-70b-instruct",
+            "meta/llama-3.3-70b-instruct"
         ],
         "mistralai": [
             "mistral-large-latest",
