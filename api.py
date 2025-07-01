@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
     load_dotenv()
     
     token_manager = TokenManager()
-    session_manager = SessionManager(expiration_hours=2, persist_to_file=True)  # 2-hour sessions
+    session_manager = SessionManager(expiration_hours=2, persist_to_file=True)
     
     logger.info("🔁 Loading data...")
     data = DataLoader()
@@ -37,24 +37,41 @@ async def lifespan(app: FastAPI):
     document_processor = DocumentProcessor(data.landmark_prices, data.places_api_data)
     documents = document_processor.load_or_process_documents()
 
-    logger.info("🧠 Loading vector store...")
-    vector_store = VectorStoreManager(documents)
+    logger.info("🧠 Creating shared embedding model (E5-Large)...")
+    # Create a single shared embedding model instance to optimize memory usage
+    from langchain_huggingface import HuggingFaceEmbeddings
+    import torch
+    
+    shared_embeddings = HuggingFaceEmbeddings(
+        model_name="intfloat/multilingual-e5-large-instruct",
+        model_kwargs={"device": "cuda" if torch.cuda.is_available() else "cpu"},
+        encode_kwargs={'normalize_embeddings': True}
+    )
+    logger.info("✅ Shared embedding model loaded successfully")
+
+    logger.info("🧠 Loading travel planning vector store...")
+    vector_store = VectorStoreManager(documents, embeddings_instance=shared_embeddings)
     retriever = vector_store.get_retriever()
 
     logger.info("🎒 Loading packing list data...")
     packing_list_processor = PackingListProcessor("Extended_Egypt_Packing_List_with_New_Items.csv")
     packing_documents = packing_list_processor.df_to_documents()
-    packing_vector_store = VectorStoreManager(documents=packing_documents, path="packing_list")
+    
+    logger.info("🎒 Loading packing list vector store (reusing embedding model)...")
+    packing_vector_store = VectorStoreManager(
+        documents=packing_documents, 
+        embeddings_instance=shared_embeddings,  # Reuse the same embedding model instance
+        path="packing_list"
+    )
     packing_list_retriever = packing_vector_store.get_retriever()
 
     logger.info("⚡ Initializing LLM...")
-    
     model_name, provider = token_manager.get_current_model()
     temperature = token_manager.get_model_temperature()
-    
     llm_manager = LLMService(model_name, provider=provider, temperature=temperature)
     
     logger.info(f"✅ App initialized with model: {model_name} (provider: {provider}, temperature: {temperature})")
+    logger.info("🚀 Memory optimized: Using single E5-Large instance for both vector stores")
 
     yield
     logger.info("🔻 Shutting down...")
@@ -418,7 +435,7 @@ async def get_available_models():
             "gemini-2.5-flash-preview-04-17",
             "gemini-2.5-flash-lite-preview-06-17",
             "gemini-2.0-flash",
-            "gemini-2.0-flash-lite",
+            "gemini-2.0-flash-lite"
         ]
     }
     

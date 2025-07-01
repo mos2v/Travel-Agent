@@ -166,11 +166,16 @@ class DocumentProcessor():
         
         
 class VectorStoreManager():
-    def __init__(self, documents: List[Document] = None, provider=HuggingFaceEmbeddings, path='faiss_e5large_v1.0', embedding_model="intfloat/multilingual-e5-large-instruct"):
-        self.embeddings = provider(
-            model_name=embedding_model,
-            model_kwargs={"device": "cuda" if torch.cuda.is_available() else "cpu"},
-            encode_kwargs={'normalize_embeddings': True}
+    def __init__(self, documents: List[Document] = None, provider=HuggingFaceEmbeddings, path='faiss_e5large_v1.0', embedding_model="intfloat/multilingual-e5-large-instruct", embeddings_instance=None):
+        # If embeddings_instance is provided, use it directly (for memory optimization)
+        if embeddings_instance is not None:
+            self.embeddings = embeddings_instance
+        else:
+            # Create new embedding instance (default behavior)
+            self.embeddings = provider(
+                model_name=embedding_model,
+                model_kwargs={"device": "cuda" if torch.cuda.is_available() else "cpu"},
+                encode_kwargs={'normalize_embeddings': True}
             )
         self.path = Path(path)
         self.documents = documents
